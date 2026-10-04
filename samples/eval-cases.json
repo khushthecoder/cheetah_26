@@ -1,0 +1,60 @@
+[
+  {
+    "id": "gp-classic",
+    "note": "Typical Indian GP prescription with dash notation and abbreviations",
+    "text": "Dr. A. Sharma  MBBS, MD (Medicine)\nPt: Mrs. Kamla Devi   68/F     4/10/26\nDx: HTN, T2DM\n\nRx\n1) Tab. Telma 40        1-0-0   after breakfast   x 1 month\n2) Tab. Glycomet GP 1   1-0-1   before food       continue\n3) Tab. Ecosprin 75     0-0-1   after dinner\n4) Tab. Rosuvas 10      HS\n5) Cap. Pan D           OD  empty stomach   x 15 days\n6) Tab. Dolo 650        SOS for fever\n\nReview after 1 month with FBS, PPBS, HbA1c",
+    "expected": [
+      { "name": "telma", "slots": ["morning"] },
+      { "name": "glycomet", "slots": ["morning", "night"] },
+      { "name": "ecosprin", "slots": ["night"] },
+      { "name": "rosuvas", "slots": ["night"] },
+      { "name": "pan", "slots": ["morning"] },
+      { "name": "dolo", "slots": [], "asNeeded": true }
+    ]
+  },
+  {
+    "id": "latin-abbrev",
+    "note": "Latin frequency codes only",
+    "text": "Rx\nT. Amlodac 5 mg  OD\nT. Metolar XR 25  BD\nT. Atorva 10  HS\nSyp. Cremaffin 15 ml  HS\nT. Shelcal 500  BD PC",
+    "expected": [
+      { "name": "amlodac", "slots": ["morning"] },
+      { "name": "metolar", "slots": ["morning", "night"] },
+      { "name": "atorva", "slots": ["night"] },
+      { "name": "cremaffin", "slots": ["night"] },
+      { "name": "shelcal", "slots": ["morning", "night"] }
+    ]
+  },
+  {
+    "id": "spoken",
+    "note": "Instructions as a family member typed them after the visit",
+    "text": "Doctor said: Azithral 500 once a day in the morning for 3 days after food. Montair LC one tablet at night for 5 days. Dolo 650 only if fever goes above 100. Benadryl syrup 2 spoons three times a day.",
+    "expected": [
+      { "name": "azithral", "slots": ["morning"] },
+      { "name": "montair", "slots": ["night"] },
+      { "name": "dolo", "slots": [], "asNeeded": true },
+      { "name": "benadryl", "slots": ["morning", "afternoon", "night"] }
+    ]
+  },
+  {
+    "id": "hinglish",
+    "note": "Hinglish WhatsApp message from a sibling",
+    "text": "bhai doctor ne bola hai: Thyronorm 50 subah khali pet. Shelcal 500 dopahar khane ke baad. Telma AM 1-0-0. Glimisave M1 1-0-1 khane se pehle.",
+    "expected": [
+      { "name": "thyronorm", "slots": ["morning"] },
+      { "name": "shelcal", "slots": ["afternoon"] },
+      { "name": "telma", "slots": ["morning"] },
+      { "name": "glimisave", "slots": ["morning", "night"] }
+    ]
+  },
+  {
+    "id": "four-slot",
+    "note": "Four-slot notation and half tablets",
+    "text": "1. Tab Augmentin 625   1-0-0-1  x 5 days\n2. Tab Zerodol SP   1-0-1  after food  x 5 days\n3. Cap Omez 20   1-0-0  before breakfast\n4. Tab Lonazep 0.25   0-0-½",
+    "expected": [
+      { "name": "augmentin", "slots": ["morning", "night"] },
+      { "name": "zerodol", "slots": ["morning", "night"] },
+      { "name": "omez", "slots": ["morning"] },
+      { "name": "lonazep", "slots": ["night"] }
+    ]
+  }
+]
