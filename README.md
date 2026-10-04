@@ -4,6 +4,8 @@
 
 > Built for the Hacktoberfest 2026 Weekend Challenge: *Build for a Friend*.
 
+**Live:** https://dosecard.onrender.com — the page is hosted; the AI runs on your own computer (see [Deployment](#deployment-render)).
+
 <!-- TODO: screenshot of the printed card on the fridge -->
 
 ## Why I built this
