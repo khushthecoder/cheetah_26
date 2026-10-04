@@ -11,6 +11,7 @@ describe('interpretFrequency', () => {
     ['1-0-1', ['morning:1', 'night:1']],
     ['1-1-1', ['morning:1', 'afternoon:1', 'night:1']],
     ['0-0-1', ['night:1']],
+    ['0-1-0', ['afternoon:1']],
     ['1 - 0 - 0', ['morning:1']],
     ['1–0–1 after food', ['morning:1', 'night:1']],
     ['½-0-½', ['morning:½', 'night:½']],

@@ -122,3 +122,45 @@ describe('extractPrescription', () => {
     await expect(extractPrescription({ text: 'x' }, { fetchImpl: okFetch('not json') })).rejects.toBeInstanceOf(ExtractionError)
   })
 })
+
+describe('safety checks', () => {
+  const source = 'Tab. Telma 40   1-0-0   after breakfast'
+
+  it('passes rows that are grounded in the entered text', () => {
+    const [m] = parseModelOutput(output([row()]), source).medicines
+    expect(m.issues).toEqual([])
+  })
+
+  it('flags a medicine name the model changed', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Telmisartan' })]), source).medicines
+    expect(m.issues.join(' ')).toMatch(/doesn't appear in the text/)
+  })
+
+  it('flags dosing text the model invented', () => {
+    const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1' })]), source).medicines
+    expect(m.issues.join(' ')).toMatch(/Dosing "1-0-1" doesn't appear/)
+  })
+
+  it('flags disagreement between the rule decoder and the model', () => {
+    const [m] = parseModelOutput(output([row({ model_slots: ['night'] })])).medicines
+    expect(m.doses.morning).toBe('1')
+    expect(m.issues.join(' ')).toMatch(/read the timing differently/)
+  })
+
+  it('skips grounding when there is no source text (photo input)', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Anything' })]), '').medicines
+    expect(m.issues).toEqual([])
+  })
+})
+
+describe('grounding matches whole words', () => {
+  it('does not let "1-0-1" hide inside other numbers', () => {
+    const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1' })]), 'Tab. Telma 40 1-0-0 x 10 days').medicines
+    expect(m.issues.join(' ')).toMatch(/Dosing "1-0-1" doesn't appear/)
+  })
+
+  it('tolerates spacing and punctuation differences', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Glycomet GP', frequency_text: '1-0-1', model_slots: ['morning', 'night'] })]), 'Tab.Glycomet-GP 1   1 - 0 - 1').medicines
+    expect(m.issues).toEqual([])
+  })
+})

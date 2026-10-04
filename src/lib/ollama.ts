@@ -116,6 +116,7 @@ export async function extractPrescription(input: ExtractInput, opts: ExtractOpti
   }
 
   const data = (await res.json()) as { message?: { content?: string } }
-  const extraction = parseModelOutput(data.message?.content ?? '')
+  // Grounding checks only make sense when there is no photo (the text is then the whole source).
+  const extraction = parseModelOutput(data.message?.content ?? '', images.length ? '' : text)
   return { extraction, model, durationMs: Math.round(performance.now() - started) }
 }

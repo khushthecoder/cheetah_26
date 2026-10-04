@@ -96,9 +96,38 @@ export class ExtractionError extends Error {
 let idCounter = 0
 const newId = () => `med-${Date.now().toString(36)}-${(idCounter++).toString(36)}`
 
-/** Turn one validated model row into a Medicine, preferring deterministic rules over the model's guess. */
-export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>): Medicine {
+/** Lowercase, punctuation → single spaces, padded so `includes(' x ')` matches whole words only. */
+const words = (s: string) =>
+  ` ${s
+    .toLowerCase()
+    .replace(/(?<!\d)\.|\.(?!\d)/g, ' ') // keep the dot only inside decimals like 0.5
+    .replace(/[^a-z0-9½.]+/g, ' ')
+    .trim()} `
+
+/**
+ * For typed/pasted input we can check the model's transcription against what was actually entered.
+ * A small model sometimes "corrects" a brand name into a different, real-looking drug — this catches it.
+ */
+function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: string): string[] {
+  const source = words(sourceText)
+  if (!source.trim()) return []
   const issues: string[] = []
+  const nameTokens = words(raw.name).trim().split(' ').filter((t) => t.length >= 3)
+  if (nameTokens.length > 0 && !nameTokens.some((t) => source.includes(` ${t} `))) {
+    issues.push(`"${raw.name}" doesn't appear in the text you entered — the AI may have changed the spelling.`)
+  }
+  const freq = words(raw.frequency_text)
+  if (freq.trim() && !source.includes(freq)) {
+    issues.push(`Dosing "${raw.frequency_text}" doesn't appear in the text you entered — check the timing.`)
+  }
+  return issues
+}
+
+const sameSlots = (a: Slot[], b: Slot[]) => a.length === b.length && a.every((s) => b.includes(s))
+
+/** Turn one validated model row into a Medicine, preferring deterministic rules over the model's guess. */
+export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText = ''): Medicine {
+  const issues: string[] = groundingIssues(raw, sourceText)
   const combined = [raw.frequency_text, raw.food_text, raw.instructions].filter(Boolean).join(' ')
   const rule = interpretFrequency(raw.frequency_text) ?? (raw.instructions ? interpretFrequency(combined) : null)
 
@@ -111,6 +140,11 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>): Medicine {
     asNeeded = rule.asNeeded
     interpretedBy = 'rule'
     issues.push(...rule.notes)
+    // Second opinion: if the model read the timing differently, a human should look closely.
+    const ruleSlots = SLOTS.filter((s) => rule.doses[s])
+    if (!rule.asNeeded && raw.model_slots.length > 0 && !sameSlots(ruleSlots, raw.model_slots)) {
+      issues.push(`The AI read the timing differently (${raw.model_slots.join(', ')}). Check against the paper.`)
+    }
   } else if (raw.model_slots.length > 0) {
     for (const s of raw.model_slots) doses[s] = '1'
     interpretedBy = 'model'
@@ -153,7 +187,7 @@ function extractJsonText(content: string): string {
 }
 
 /** Validate raw model output. Bad rows are dropped individually rather than failing the whole result. */
-export function parseModelOutput(content: string): Extraction {
+export function parseModelOutput(content: string, sourceText = ''): Extraction {
   if (!content.trim()) throw new ExtractionError('The model returned an empty response.', 'empty')
 
   let json: unknown
@@ -179,7 +213,7 @@ export function parseModelOutput(content: string): Extraction {
     const key = `${parsed.data.name.toLowerCase()}|${parsed.data.strength.toLowerCase()}`
     if (seen.has(key)) continue
     seen.add(key)
-    medicines.push(toMedicine(parsed.data))
+    medicines.push(toMedicine(parsed.data, sourceText))
   }
 
   if (medicines.length === 0) {
