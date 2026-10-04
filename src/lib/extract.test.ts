@@ -275,3 +275,10 @@ describe('cleanStrength', () => {
     expect(cleanStrength(input)).toBe(expected)
   })
 })
+
+describe('duration', () => {
+  it('drops the leading "x" from "x 1 month"', () => {
+    const [m] = parseModelOutput(output([row({ duration_text: 'x 1 month' })])).medicines
+    expect(m.duration).toBe('1 month')
+  })
+})

@@ -245,7 +245,7 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText 
     doses,
     asNeeded,
     food: interpretFood(`${raw.food_text} ${frequencyText} ${raw.instructions}`),
-    duration: raw.duration_text,
+    duration: raw.duration_text.replace(/^[x×*]\s*/i, ''), // "x 5 days" → "5 days"
     frequencyText,
     instructions: raw.instructions,
     confidence: raw.confidence,
