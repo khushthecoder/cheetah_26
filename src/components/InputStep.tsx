@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { fileToModelImage } from '../lib/image.ts'
-import type { ModelStatus } from '../lib/ollama.ts'
+import { isHostedPage, type ModelStatus } from '../lib/ollama.ts'
 import { SAMPLE_PRESCRIPTION } from '../lib/sample.ts'
 
 export interface InputPayload {
@@ -151,17 +151,37 @@ export function InputStep({ status, error, onSubmit }: Props) {
 }
 
 function SetupHelp({ status }: { status: ModelStatus }) {
+  if (status.online) {
+    return (
+      <div className="alert warn">
+        <strong>One-time setup:</strong> download the model with <code>ollama pull {status.model}</code> (~4 GB).
+      </div>
+    )
+  }
+  if (!isHostedPage()) {
+    return (
+      <div className="alert warn">
+        <strong>Ollama isn't running.</strong> Start it with <code>ollama serve</code> (or open the Ollama app).
+      </div>
+    )
+  }
+  // Hosted page: the AI still runs on this computer. Ollama only answers pages it trusts, so it must allow this site.
+  const origin = location.origin
   return (
-    <div className="alert warn">
-      {!status.online ? (
-        <>
-          <strong>Ollama isn't running.</strong> Start it with <code>ollama serve</code> (or open the Ollama app).
-        </>
-      ) : (
-        <>
-          <strong>One-time setup:</strong> download the model with <code>ollama pull {status.model}</code> (~4 GB).
-        </>
-      )}
+    <div className="alert warn setup">
+      <strong>DoseCard's AI runs on your computer, not on this website.</strong> One-time setup:
+      <ol>
+        <li>
+          Install <a href="https://ollama.com/download">Ollama</a>, then run <code>ollama pull {status.model}</code> (~4 GB).
+        </li>
+        <li>
+          Allow this page to talk to it (macOS):
+          <pre>{`launchctl setenv OLLAMA_ORIGINS "${origin}"`}</pre>
+          then quit and reopen Ollama. Or run it directly: <code>{`OLLAMA_ORIGINS="${origin}" ollama serve`}</code>
+        </li>
+        <li>If your browser asks to access apps on this device, click Allow. Then reload this page.</li>
+      </ol>
+      Your prescription goes from this browser to Ollama on your own machine. Nothing is uploaded to this website.
     </div>
   )
 }

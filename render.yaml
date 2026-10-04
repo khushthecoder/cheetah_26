@@ -1,0 +1,35 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# DoseCard is deployed as a free static site. Only the web page is hosted here:
+# the AI (Gemma via Ollama) runs on each visitor's own computer, and the browser
+# talks to it at http://localhost:11434. Prescriptions never reach Render.
+services:
+  - type: web
+    runtime: static
+    name: dosecard
+    repo: https://github.com/khushthecoder/cheetah_26
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    # Deploy only after the GitHub Actions CI checks on the commit pass.
+    autoDeployTrigger: checksPass
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: VITE_MODEL
+        value: gemma4:e2b-it-qat
+    headers:
+      # The page may only talk to itself and to Ollama on the visitor's machine.
+      # If you change VITE_OLLAMA_BASE_URL, add that address to connect-src too.
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(self), microphone=(), geolocation=()"

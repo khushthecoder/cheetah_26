@@ -130,6 +130,37 @@ npm run read -- path/to/prescription.jpg   # one photo or .txt through the same 
 The client is tested against Ollama being offline, the model missing, timeouts, empty / non-JSON /
 wrongly-shaped output, duplicate rows and hallucinated rows.
 
+## Deployment (Render)
+
+The hosted version is a **static site on Render**. Only the web page is hosted — the AI is not.
+The visitor's browser talks to Ollama on *their own* computer (`http://localhost:11434`), so prescriptions still never
+leave the device. Running Gemma on a server instead would mean uploading health data and paying for a large CPU instance.
+
+```
+ GitHub push ─► GitHub Actions CI (typecheck · tests · build · no private/ files)
+                   │ passes
+                   ▼
+              Render static site  (render.yaml, deploys only after CI passes)
+                   │ serves HTML/JS/CSS
+                   ▼
+ Visitor's browser ──fetch──► Ollama on the visitor's machine (localhost:11434) ──► Gemma
+```
+
+- [`render.yaml`](render.yaml) — Render Blueprint: build command, publish dir, Node version, security headers
+  (the Content-Security-Policy only allows the page to talk to itself and to `localhost:11434`).
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — runs on every push and pull request.
+
+**Visitors need a one-time setup**, which the page shows them with their exact site address:
+
+```bash
+ollama pull gemma4:e2b-it-qat
+launchctl setenv OLLAMA_ORIGINS "https://<your-site>.onrender.com"   # macOS, then quit & reopen Ollama
+# or: OLLAMA_ORIGINS="https://<your-site>.onrender.com" ollama serve
+```
+
+Ollama rejects requests from any website not listed in `OLLAMA_ORIGINS` (it returns 403), so this step is required.
+Chrome may also ask for permission for the site to access apps on this device — click Allow.
+
 ## Privacy
 
 - Nothing is uploaded anywhere. Inference is local; the only server is your own machine.
@@ -143,7 +174,7 @@ wrongly-shaped output, duplicate rows and hallucinated rows.
 - Weekly / alternate-day schedules are deliberately not decoded — they're flagged for manual entry.
 - "OD" with no time written is left for the person to set — the app doesn't pick a time.
 - Grounding checks (name / strength / dose must appear in the input) only work for typed text. For photos, the side-by-side review is the safeguard.
-- Runs on a laptop; there is no phone app or hosted version (by design — see Privacy).
+- The hosted page still needs Ollama on the visitor's computer (by design — see Privacy). There is no phone app yet.
 
 ## Future work
 

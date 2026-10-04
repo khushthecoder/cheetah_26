@@ -2,8 +2,17 @@ import { MODEL_JSON_SCHEMA, MODEL_OPTIONS, parseModelOutput, SYSTEM_PROMPT, TRAN
 import type { Extraction } from './types.ts'
 
 export const DEFAULT_MODEL = (import.meta.env?.VITE_MODEL as string | undefined) || 'gemma4:e2b-it-qat'
-/** Same-origin path proxied to Ollama by Vite (see vite.config.ts). */
-export const DEFAULT_BASE_URL = '/ollama'
+/**
+ * Where the browser reaches Ollama.
+ * - `npm run dev`: same-origin `/ollama`, proxied by Vite (see vite.config.ts).
+ * - Production build (e.g. the Render static site): the visitor's OWN machine. The page is hosted,
+ *   the model is not — prescriptions go from the browser straight to localhost, never to a server.
+ */
+export const DEFAULT_BASE_URL =
+  (import.meta.env?.VITE_OLLAMA_BASE_URL as string | undefined) || (import.meta.env?.DEV ? '/ollama' : 'http://localhost:11434')
+
+/** True when the page is served from somewhere other than this machine, so Ollama must allow its origin. */
+export const isHostedPage = () => typeof location !== 'undefined' && !['localhost', '127.0.0.1'].includes(location.hostname)
 const TIMEOUT_MS = 180_000
 
 export class OllamaError extends Error {
