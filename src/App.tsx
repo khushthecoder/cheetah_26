@@ -65,10 +65,10 @@ export function App() {
     }
   }
 
+  // The patient name is never pre-filled from the model: on a real photo it "read" one from header scribbles.
   async function findMedicines(text: string, fallback: Step) {
     const result = await run('Finding the medicines…', (signal) => extractPrescription(text, { signal }), fallback)
     if (!result) return
-    setPatientName(result.extraction.patientName)
     setMedicines(result.extraction.medicines)
     setUnreadable(result.extraction.unreadable)
     setLastRun({ ms: result.durationMs, model: result.model })

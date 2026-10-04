@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cleanName, ExtractionError, parseModelOutput } from './extract.ts'
+import { cleanName, cleanStrength, ExtractionError, parseModelOutput } from './extract.ts'
 import { extractPrescription, OllamaError, transcribePhoto } from './ollama.ts'
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -259,5 +259,19 @@ describe('anchoring noise', () => {
     const [m] = parseModelOutput(output([row({ name: 'Zerodol SP', strength: null, frequency_text: '1-0-1 after food x 5 days' })]), 'Tab Zerodol SP   1-0-1  after food  x 5 days').medicines
     expect(m.frequencyText).toBe('1-0-1')
     expect(m.issues).toEqual([])
+  })
+})
+
+describe('cleanStrength', () => {
+  it.each([
+    ['0.05 ointment', '0.05'],
+    ['2.5%', '2.5%'],
+    ['500 mg', '500 mg'],
+    ['60K', '60K'],
+    ['D', ''],
+    ['1-0-0', ''],
+    ['', ''],
+  ])('%s -> %s', (input, expected) => {
+    expect(cleanStrength(input)).toBe(expected)
   })
 })

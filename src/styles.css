@@ -270,6 +270,8 @@ textarea {
 }
 .thumb img {
   transition: transform 0.2s;
+  object-fit: contain;
+  background: #f1eee8;
 }
 .thumb-rotate {
   position: absolute;

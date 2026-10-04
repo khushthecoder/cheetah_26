@@ -150,6 +150,13 @@ function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: s
   return issues
 }
 
+/** Keep only number + unit ("0.05 ointment" → "0.05"); drop non-numeric "strengths" and misplaced doses. */
+export function cleanStrength(strength: string): string {
+  if (!/\d/.test(strength) || findDoseTexts(strength).length > 0) return ''
+  const m = strength.match(/\d+(?:\.\d+)?\s*(?:mg|mcg|µg|g|ml|%|iu|k|lac|lakh)?(?:\s*\/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|%)?)?/i)
+  return m ? m[0].trim() : ''
+}
+
 /** Remove the "T."/"Tab." prefix and a dosing pattern the model copied into the name ("T. Vite 0-1-0" → "Vite"). */
 export function cleanName(name: string, frequencyText: string): string {
   let n = name.replace(/^(tab|tablet|cap|capsule|syp|syrup|inj|t|c)\.?\s+/i, '')
@@ -233,7 +240,7 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText 
     name: cleanName(raw.name, frequencyText),
     // A strength without any digit ("D" from "Pan D") is a split brand name, not a strength.
     // …and a dose pattern in the strength field ("1-0-0") is a misplaced dose, not a strength.
-    strength: /\d/.test(raw.strength) && findDoseTexts(raw.strength).length === 0 ? raw.strength : '',
+    strength: cleanStrength(raw.strength),
     form: raw.form,
     doses,
     asNeeded,
