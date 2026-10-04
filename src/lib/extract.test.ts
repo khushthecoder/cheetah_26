@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ExtractionError, parseModelOutput } from './extract.ts'
-import { extractPrescription, OllamaError } from './ollama.ts'
+import { cleanName, ExtractionError, parseModelOutput } from './extract.ts'
+import { extractPrescription, OllamaError, transcribePhoto } from './ollama.ts'
 
 const row = (over: Record<string, unknown> = {}) => ({
   name: 'Telma',
@@ -83,7 +83,7 @@ describe('extractPrescription', () => {
 
   it('sends text, schema and deterministic options to Ollama', async () => {
     const fetchImpl = okFetch(output([row()]))
-    const result = await extractPrescription({ text: 'Tab Telma 40 1-0-0' }, { fetchImpl, baseUrl: 'http://x', model: 'm' })
+    const result = await extractPrescription('Tab Telma 40 1-0-0', { fetchImpl, baseUrl: 'http://x', model: 'm' })
     expect(result.extraction.medicines).toHaveLength(1)
     const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
     expect(url).toBe('http://x/api/chat')
@@ -94,25 +94,37 @@ describe('extractPrescription', () => {
     expect(body.format.required).toContain('medicines')
     expect(body.messages[1].content).toContain('Tab Telma 40 1-0-0')
     expect(body.messages[1].images).toBeUndefined()
+    expect(result.extraction.medicines[0].issues).toEqual([])
   })
 
-  it('attaches images when given', async () => {
-    const fetchImpl = okFetch(output([row()]))
-    await extractPrescription({ images: ['AAAA'] }, { fetchImpl, baseUrl: 'http://x' })
+  it('transcribes photos as plain text without a JSON schema', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ message: { content: '```\nT. Vite 0-1-0\nT. Zinc 1-0-0\n```' } }), { status: 200 })) as unknown as typeof fetch
+    const result = await transcribePhoto(['AAAA'], { fetchImpl, baseUrl: 'http://x' })
+    expect(result.text).toBe('T. Vite 0-1-0\nT. Zinc 1-0-0')
     const body = JSON.parse((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body)
-    expect(body.messages[1].images).toEqual(['AAAA'])
+    expect(body.messages[0].images).toEqual(['AAAA'])
+    expect(body.format).toBeUndefined()
+    expect(body.options.num_predict).toBeGreaterThan(0)
+  })
+
+  it('caps generation so a repetition loop cannot run forever', async () => {
+    const fetchImpl = okFetch(output([row()]))
+    await extractPrescription('Tab Telma 40 1-0-0', { fetchImpl, baseUrl: 'http://x' })
+    const body = JSON.parse((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body)
+    expect(body.options.num_predict).toBeGreaterThan(0)
+    expect(body.format.properties.medicines.maxItems).toBeGreaterThan(0)
   })
 
   it('reports Ollama being offline', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('fetch failed')
     }) as unknown as typeof fetch
-    await expect(extractPrescription({ text: 'x' }, { fetchImpl })).rejects.toMatchObject({ kind: 'offline' })
+    await expect(extractPrescription('x', { fetchImpl })).rejects.toMatchObject({ kind: 'offline' })
   })
 
   it('reports a missing model with the pull command', async () => {
     const fetchImpl = vi.fn(async () => new Response('{"error":"model \\"m\\" not found"}', { status: 404 })) as unknown as typeof fetch
-    await expect(extractPrescription({ text: 'x' }, { fetchImpl, model: 'm' })).rejects.toThrow(/ollama pull m/)
+    await expect(extractPrescription('x', { fetchImpl, model: 'm' })).rejects.toThrow(/ollama pull m/)
   })
 
   it('times out slow inference', async () => {
@@ -120,13 +132,13 @@ describe('extractPrescription', () => {
       (_url: string, init: RequestInit) =>
         new Promise<Response>((_, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))),
     ) as unknown as typeof fetch
-    const err = await extractPrescription({ text: 'x' }, { fetchImpl, timeoutMs: 10 }).catch((e) => e)
+    const err = await extractPrescription('x', { fetchImpl, timeoutMs: 10 }).catch((e) => e)
     expect(err).toBeInstanceOf(OllamaError)
     expect(err.kind).toBe('timeout')
   })
 
   it('surfaces malformed model output as an ExtractionError', async () => {
-    await expect(extractPrescription({ text: 'x' }, { fetchImpl: okFetch('not json') })).rejects.toBeInstanceOf(ExtractionError)
+    await expect(extractPrescription('x', { fetchImpl: okFetch('not json') })).rejects.toBeInstanceOf(ExtractionError)
   })
 })
 
@@ -143,9 +155,16 @@ describe('safety checks', () => {
     expect(m.issues.join(' ')).toMatch(/doesn't appear in the text/)
   })
 
-  it('flags dosing text the model invented', () => {
+  it('replaces a dose the model invented with the one written next to the medicine, and flags it', () => {
     const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1' })]), source).medicines
-    expect(m.issues.join(' ')).toMatch(/Dosing "1-0-1" doesn't appear/)
+    expect(m.frequencyText).toBe('1-0-0')
+    expect(m.doses).toEqual({ morning: '1', afternoon: null, evening: null, night: null })
+    expect(m.issues.join(' ')).toMatch(/paired this with "1-0-1", but "1-0-0" is written next to it/)
+  })
+
+  it('flags dosing text that is nowhere in the input', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Zzzmed', frequency_text: 'TDS' })]), source).medicines
+    expect(m.issues.join(' ')).toMatch(/Dosing "TDS" doesn't appear/)
   })
 
   it('skips grounding when there is no source text (photo input)', () => {
@@ -156,7 +175,7 @@ describe('safety checks', () => {
 
 describe('grounding matches whole words', () => {
   it('does not let "1-0-1" hide inside other numbers', () => {
-    const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1' })]), 'Tab. Telma 40 1-0-0 x 10 days').medicines
+    const [m] = parseModelOutput(output([row({ name: 'Other', frequency_text: '1-0-1' })]), 'Tab. Telma 40 1-0-0 x 10 days').medicines
     expect(m.issues.join(' ')).toMatch(/Dosing "1-0-1" doesn't appear/)
   })
 
@@ -175,5 +194,70 @@ describe('strength grounding (live run regression)', () => {
   it('accepts strengths written with or without a unit', () => {
     const meds = parseModelOutput(output([row({ name: 'Telma', strength: '40 mg', frequency_text: '1-0-0' }), row({ name: 'Vitamin D3', strength: '60K', frequency_text: '' })]), source).medicines
     expect(meds.flatMap((m) => m.issues).filter((i) => i.startsWith('Strength'))).toEqual([])
+  })
+})
+
+describe('cleanName (real photo regression)', () => {
+  it.each([
+    ['T. Vite 0-1-0', '0-1-0', 'Vite'],
+    ['T. zul (ad) 1-0-0', '1-0-0', 'zul (ad)'],
+    ['Tab. Telma', '1-0-0', 'Telma'],
+    ['Glycomet GP', '1-0-1', 'Glycomet GP'],
+    ['BPO', '', 'BPO'],
+  ])('%s -> %s', (name, freq, expected) => {
+    expect(cleanName(name, freq)).toBe(expected)
+  })
+})
+
+describe('prompt hygiene', () => {
+  it('contains no real medicine names the model could copy into an answer', async () => {
+    const { SYSTEM_PROMPT, TRANSCRIBE_PROMPT } = await import('./extract.ts')
+    for (const brand of ['telma', 'glycomet', 'dolo', 'warm water', 'metformin']) {
+      expect(SYSTEM_PROMPT.toLowerCase()).not.toContain(brand)
+      expect(TRANSCRIBE_PROMPT.toLowerCase()).not.toContain(brand)
+    }
+  })
+})
+
+describe('dose anchoring (real handwritten photo regression)', () => {
+  // Transcript Gemma produced from the real photo; Vit C is 0-1-0, Zinc's dose is on the line below it.
+  const transcript = "SIB slu-\nAde\nS' Acu (G I)\nT. Vite 0-1-0\n+ Chomi\nluu\nT. zul (ad)\n1-0-0\nButonim 0.05 ointment\nBPO 2.5% gel."
+
+  it('fixes the model pairing Vit C with Zinc\'s dose', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Vite 0-1-0', strength: null, frequency_text: '1-0-0' })]), transcript).medicines
+    expect(m.name).toBe('Vite')
+    expect(m.doses).toEqual({ morning: null, afternoon: '1', evening: null, night: null })
+    expect(m.issues.join(' ')).toMatch(/"0-1-0" is written next to it/)
+  })
+
+  it('picks up a dose written on the line below the medicine', () => {
+    const [m] = parseModelOutput(output([row({ name: 'zul (ad)', strength: null, frequency_text: null })]), transcript).medicines
+    expect(m.doses.morning).toBe('1')
+    expect(m.issues.join(' ')).toMatch(/"1-0-0" is written next to this medicine/)
+  })
+
+  it('drops a dose pattern the model put in the strength field', () => {
+    const [m] = parseModelOutput(output([row({ name: 'zul (ad)', strength: '1-0-0', frequency_text: null })]), transcript).medicines
+    expect(m.strength).toBe('')
+  })
+
+  it('leaves medicines with no written dose for the person', () => {
+    const [m] = parseModelOutput(output([row({ name: 'BPO', strength: '2.5%', frequency_text: null })]), transcript).medicines
+    expect(Object.values(m.doses).every((v) => v === null)).toBe(true)
+  })
+
+  it('does not anchor from a line that names several doses', () => {
+    const line = 'Telma AM 1-0-0. Glimisave M1 1-0-1 khane se pehle.'
+    const [m] = parseModelOutput(output([row({ name: 'Glimisave M1', strength: null, frequency_text: '1-0-1' })]), line).medicines
+    expect(m.doses).toEqual({ morning: '1', afternoon: null, evening: null, night: '1' })
+    expect(m.issues).toEqual([])
+  })
+})
+
+describe('anchoring noise', () => {
+  it('does not flag when the model copied the same dose with extra words', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Zerodol SP', strength: null, frequency_text: '1-0-1 after food x 5 days' })]), 'Tab Zerodol SP   1-0-1  after food  x 5 days').medicines
+    expect(m.frequencyText).toBe('1-0-1')
+    expect(m.issues).toEqual([])
   })
 })

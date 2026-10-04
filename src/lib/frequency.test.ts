@@ -35,6 +35,8 @@ describe('interpretFrequency', () => {
     ['Telma 40 1-0-0', ['morning:1']],
     ['500 1-0-1', ['morning:1', 'night:1']],
     ['1-0-1 x 5 days', ['morning:1', 'night:1']],
+    ['Metformin 500 — 1-0-1 with meals', ['morning:1', 'night:1']],
+    ['1.5-0-1', ['morning:1½', 'night:1']],
   ])('%s', (input, expected) => {
     expect(slotsOf(input)).toEqual(expected)
   })

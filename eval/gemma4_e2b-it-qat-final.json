@@ -19,14 +19,14 @@
       "correct": 5,
       "wrong": 0,
       "leftForHuman": 1,
-      "ms": 9217.195084,
-      "tokPerSec": 43.41651984723852,
+      "ms": 10086.596542,
+      "tokPerSec": 39.405967894939366,
       "details": [
         "  ✓ Telma            written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
         "  ✓ Glycomet GP      written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
         "  ✓ Ecosprin         written \"0-0-1\" → dosecard:[night] (rule) expected:[night]",
         "  ✓ Rosuvas          written \"HS\" → dosecard:[night] (rule) expected:[night]",
-        "  ◦ Pan D            written \"OD\" → dosecard:[] (rule) expected:[morning]  ⚠ Once a day, but the time isn't written. Tap the time the doctor told you.",
+        "  ◦ Pan D            written \"OD\" → dosecard:[] (rule) expected:[morning]  ⚠ Once a day, but the time isn't written. Tap the time the doctor told you. / Name was hard to read — compare spelling with the paper.",
         "  ✓ Dolo             written \"SOS\" → dosecard:[,SOS] (rule) expected:[,SOS]"
       ]
     },
@@ -38,14 +38,14 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 1,
-      "ms": 7710.614833,
-      "tokPerSec": 45.21376592595413,
+      "ms": 8042.5445420000015,
+      "tokPerSec": 38.76027013502475,
       "details": [
         "  ◦ Amlodac          written \"OD\" → dosecard:[] (rule) expected:[morning]  ⚠ Once a day, but the time isn't written. Tap the time the doctor told you.",
         "  ✓ Metolar XR       written \"BD\" → dosecard:[morning,night] (rule) expected:[morning,night]",
         "  ✓ Atorva           written \"HS\" → dosecard:[night] (rule) expected:[night]",
         "  ✓ Cremaffin        written \"HS\" → dosecard:[night] (rule) expected:[night]",
-        "  ✓ Shelcal          written \"BD\" → dosecard:[morning,night] (rule) expected:[morning,night]"
+        "  ✓ Shelcal          written \"BD PC\" → dosecard:[morning,night] (rule) expected:[morning,night]"
       ]
     },
     {
@@ -56,13 +56,13 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 7483.067209000001,
-      "tokPerSec": 41.99885977563673,
+      "ms": 7370.020167000002,
+      "tokPerSec": 39.582127054912554,
       "details": [
-        "  ✓ Azithral         written \"once a day in the morning\" → dosecard:[morning] (rule) expected:[morning]",
-        "  ✓ Montair LC       written \"at night\" → dosecard:[night] (rule) expected:[night]",
-        "  ✓ Dolo             written \"only if fever goes above 100\" → dosecard:[,SOS] (rule) expected:[,SOS]",
-        "  ✓ Benadryl         written \"three times a day\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]"
+        "  ✓ Azithral         written \"once a day in the morning for 3 days after food\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Montair LC       written \"at night for 5 days\" → dosecard:[night] (rule) expected:[night]",
+        "  ✓ Dolo             written \"only if fever goes above 100\" → dosecard:[,SOS] (rule) expected:[,SOS]  ⚠ Name was hard to read — compare spelling with the paper.",
+        "  ✓ Benadryl syrup   written \"three times a day\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]"
       ]
     },
     {
@@ -73,13 +73,13 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 6992.318416999999,
-      "tokPerSec": 44.29141963273939,
+      "ms": 6880.5793749999975,
+      "tokPerSec": 40.48132600996723,
       "details": [
         "  ✓ Thyronorm        written \"subah khali pet\" → dosecard:[morning] (rule) expected:[morning]",
         "  ✓ Shelcal          written \"dopahar khane ke baad\" → dosecard:[afternoon] (rule) expected:[afternoon]",
-        "  ✓ Telma AM         written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
-        "  ✓ Glimisave M1     written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]"
+        "  ✓ Telma            written \"AM\" → dosecard:[morning] (rule) expected:[morning]  ⚠ The AI paired this with \"AM\", but \"1-0-0\" is written next to it — using that. Check the paper. / Name was hard to read — compare spelling with the paper.",
+        "  ✓ Glimisave        written \"khane se pehle\" → dosecard:[morning,night] (rule) expected:[morning,night]  ⚠ The AI paired this with \"khane se pehle\", but \"1-0-1\" is written next to it — using that. Check the paper."
       ]
     },
     {
@@ -90,12 +90,12 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 6811.910625000004,
-      "tokPerSec": 45.053462333643004,
+      "ms": 7101.271124999999,
+      "tokPerSec": 41.62406125521282,
       "details": [
-        "  ✓ Augmentin        written \"1-0-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
-        "  ✓ Zerodol SP       written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
-        "  ✓ Omez             written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Augmentin        written \"1-0-0-1 x 5 days\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Zerodol SP       written \"1-0-1 after food x 5 days\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Omez             written \"1-0-0 before breakfast\" → dosecard:[morning] (rule) expected:[morning]",
         "  ✓ Lonazep          written \"0-0-½\" → dosecard:[night] (rule) expected:[night]"
       ]
     },
@@ -107,12 +107,12 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 6935.334333999999,
-      "tokPerSec": 43.0033959749468,
+      "ms": 6629.030250000003,
+      "tokPerSec": 40.50225953753354,
       "details": [
-        "  ✓ Zerodol-P        written \"1-1-1\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]",
+        "  ✓ Zerodol-P        written \"x 5d\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]  ⚠ The AI paired this with \"x 5d\", but \"1-1-1\" is written next to it — using that. Check the paper.",
         "  ✓ Pantocid         written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
-        "  ✓ Shelcal-HD       written \"0-1-0\" → dosecard:[afternoon] (rule) expected:[afternoon]",
+        "  ✓ Shelcal-HD       written \"\" → dosecard:[afternoon] (rule) expected:[afternoon]  ⚠ Dose \"0-1-0\" is written next to this medicine — check the paper. / Name was hard to read — compare spelling with the paper.",
         "  ✓ Volini           written \"twice daily\" → dosecard:[morning,night] (rule) expected:[morning,night]"
       ]
     },
@@ -124,12 +124,12 @@
       "correct": 3,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 5155.659915999997,
-      "tokPerSec": 44.65405132467961,
+      "ms": 5142.021249999998,
+      "tokPerSec": 41.52898079160051,
       "details": [
-        "  ✓ Calpol           written \"TDS\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]",
+        "  ✓ Calpol           written \"x 3 days\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]  ⚠ The AI paired this with \"x 3 days\", but \"TDS\" is written next to it — using that. Check the paper.",
         "  ✓ Ascoril LS       written \"BD\" → dosecard:[morning,night] (rule) expected:[morning,night]",
-        "  ✓ Nasivion         written \"HS\" → dosecard:[night] (rule) expected:[night]"
+        "  ✓ Nasivion paediatric drops written \"HS\" → dosecard:[night] (rule) expected:[night]"
       ]
     },
     {
@@ -140,13 +140,13 @@
       "correct": 4,
       "wrong": 0,
       "leftForHuman": 0,
-      "ms": 7015.723582999999,
-      "tokPerSec": 42.48210261078972,
+      "ms": 6673.844333000001,
+      "tokPerSec": 41.96448484351255,
       "details": [
-        "  ✓ Thyrox           written \"empty stomach, morning\" → dosecard:[morning] (rule) expected:[morning]",
-        "  ✓ Metformin        written \"1-0-1 with meals\" → dosecard:[morning,night] (rule) expected:[morning,night]",
-        "  ✓ Vitamin D3       written \"once weekly x 8 weeks\" → dosecard:[] (none) expected:[]  ⚠ Couldn't decode \"once weekly x 8 weeks\". Set the times by hand.",
-        "  ✓ Cetirizine       written \"at bedtime if itching\" → dosecard:[night,SOS] (rule) expected:[night,SOS]"
+        "  ✓ T. Thyrox        written \"morning\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ T. Metformin     written \"1-0-1 with meals\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ T. Vitamin D3    written \"once weekly x 8 weeks\" → dosecard:[] (none) expected:[]  ⚠ Couldn't decode \"once weekly x 8 weeks\". Set the times by hand.",
+        "  ✓ T. Cetirizine    written \"at bedtime if itching\" → dosecard:[night,SOS] (rule) expected:[night,SOS]"
       ]
     }
   ]

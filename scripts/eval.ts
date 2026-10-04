@@ -11,7 +11,7 @@
  * Baseline from the earlier design, where the model also guessed times: eval/baseline-with-model-slots.json
  */
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
-import { MODEL_JSON_SCHEMA, ModelMedicineSchema, ModelOutputSchema, SYSTEM_PROMPT, toMedicine } from '../src/lib/extract.ts'
+import { MODEL_JSON_SCHEMA, MODEL_OPTIONS, ModelMedicineSchema, ModelOutputSchema, SYSTEM_PROMPT, toMedicine } from '../src/lib/extract.ts'
 import { SLOTS, type Slot } from '../src/lib/types.ts'
 
 interface Expected {
@@ -43,7 +43,7 @@ async function run(c: Case) {
       stream: false,
       think: false,
       format: MODEL_JSON_SCHEMA,
-      options: { temperature: 0, num_ctx: 4096 },
+      options: MODEL_OPTIONS,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Read this prescription.\n\nPrescription text:\n"""\n${c.text}\n"""` },
@@ -71,7 +71,7 @@ async function run(c: Case) {
       continue
     }
     found++
-    const med = toMedicine(row)
+    const med = toMedicine(row, c.text) // same source-text checks the app runs
     const pipelineSlots = SLOTS.filter((s) => med.doses[s])
     const blank = pipelineSlots.length === 0 && !med.asNeeded
     const ok = sameSlots(pipelineSlots, exp.slots) && (exp.asNeeded ?? false) === med.asNeeded

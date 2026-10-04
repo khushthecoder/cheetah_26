@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { DoseCardView } from './components/DoseCardView.tsx'
 import { InputStep, type InputPayload } from './components/InputStep.tsx'
 import { ReviewStep } from './components/ReviewStep.tsx'
+import { TranscriptStep } from './components/TranscriptStep.tsx'
 import { ExtractionError } from './lib/extract.ts'
-import { checkModel, DEFAULT_MODEL, extractPrescription, OllamaError, type ModelStatus } from './lib/ollama.ts'
+import { checkModel, DEFAULT_MODEL, extractPrescription, OllamaError, transcribePhoto, type ModelStatus } from './lib/ollama.ts'
 import { clearCard, loadCard, saveCard } from './lib/storage.ts'
 import type { Medicine } from './lib/types.ts'
 
-type Step = 'input' | 'reading' | 'review' | 'card'
+type Step = 'input' | 'reading' | 'transcript' | 'review' | 'card'
 
 export function App() {
   const saved = useRef(loadCard()).current
@@ -20,6 +21,7 @@ export function App() {
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [sourceText, setSourceText] = useState('')
   const [elapsed, setElapsed] = useState(0)
+  const [readingLabel, setReadingLabel] = useState('Reading the prescription…')
   const [lastRun, setLastRun] = useState<{ ms: number; model: string } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -40,36 +42,52 @@ export function App() {
     return () => clearInterval(id)
   }, [step])
 
-  // Release photo object URLs when they are replaced.
-  useEffect(() => () => photoUrls.forEach((u) => URL.revokeObjectURL(u)), [photoUrls])
-
-  async function handleRead(payload: InputPayload) {
+  /** Runs one model call with the shared loading / cancel / error handling. Returns null if it failed. */
+  async function run<T>(label: string, fn: (signal: AbortSignal) => Promise<T>, fallback: Step): Promise<T | null> {
     setError(null)
     setElapsed(0)
-    setPhotoUrls(payload.photoUrls)
-    setSourceText(payload.text)
+    setReadingLabel(label)
     setStep('reading')
     const controller = new AbortController()
     abortRef.current = controller
     try {
-      const result = await extractPrescription({ text: payload.text, images: payload.images }, { signal: controller.signal })
-      setPatientName(result.extraction.patientName)
-      setMedicines(result.extraction.medicines)
-      setUnreadable(result.extraction.unreadable)
-      setLastRun({ ms: result.durationMs, model: result.model })
-      setStep('review')
+      return await fn(controller.signal)
     } catch (err) {
-      if (err instanceof OllamaError && err.kind === 'aborted') {
-        setStep('input')
-        return
+      if (!(err instanceof OllamaError && err.kind === 'aborted')) {
+        const message = err instanceof OllamaError || err instanceof ExtractionError ? err.message : `Something went wrong: ${(err as Error).message}`
+        setError(message)
+        refreshStatus()
       }
-      const message = err instanceof OllamaError || err instanceof ExtractionError ? err.message : `Something went wrong: ${(err as Error).message}`
-      setError(message)
-      setStep('input')
-      refreshStatus()
+      setStep(fallback)
+      return null
     } finally {
       abortRef.current = null
     }
+  }
+
+  async function findMedicines(text: string, fallback: Step) {
+    const result = await run('Finding the medicines…', (signal) => extractPrescription(text, { signal }), fallback)
+    if (!result) return
+    setPatientName(result.extraction.patientName)
+    setMedicines(result.extraction.medicines)
+    setUnreadable(result.extraction.unreadable)
+    setLastRun({ ms: result.durationMs, model: result.model })
+    setStep('review')
+  }
+
+  async function handleRead(payload: InputPayload) {
+    setPhotoUrls(payload.photoUrls)
+    if (payload.images.length === 0) {
+      setSourceText(payload.text)
+      await findMedicines(payload.text, 'input')
+      return
+    }
+    // Photos: transcribe first, let the person correct the reading, then structure the corrected text.
+    const result = await run('Reading the handwriting…', (signal) => transcribePhoto(payload.images, { signal }), 'input')
+    if (!result) return
+    setSourceText([result.text, payload.text.trim()].filter(Boolean).join('\n'))
+    setLastRun({ ms: result.durationMs, model: result.model })
+    setStep('transcript')
   }
 
   function handleConfirm() {
@@ -110,7 +128,7 @@ export function App() {
         {step === 'reading' && (
           <section className="panel reading" aria-live="polite">
             <div className="pulse" aria-hidden />
-            <h2>Reading the prescription…</h2>
+            <h2>{readingLabel}</h2>
             <p className="muted">
               {DEFAULT_MODEL} is running on this laptop. Nothing is being uploaded.
               <br />
@@ -120,6 +138,16 @@ export function App() {
               Cancel
             </button>
           </section>
+        )}
+        {step === 'transcript' && (
+          <TranscriptStep
+            photoUrls={photoUrls}
+            text={sourceText}
+            onText={setSourceText}
+            lastRun={lastRun}
+            onBack={() => setStep('input')}
+            onContinue={() => findMedicines(sourceText, 'transcript')}
+          />
         )}
         {step === 'review' && (
           <ReviewStep
@@ -131,7 +159,7 @@ export function App() {
             photoUrls={photoUrls}
             sourceText={sourceText}
             lastRun={lastRun}
-            onBack={() => setStep('input')}
+            onBack={() => setStep(photoUrls.length ? 'transcript' : 'input')}
             onConfirm={handleConfirm}
           />
         )}
@@ -159,7 +187,7 @@ function StatusPill({ status }: { status: ModelStatus | null }) {
 }
 
 const STEPS: { key: Step[]; label: string }[] = [
-  { key: ['input', 'reading'], label: 'Add prescription' },
+  { key: ['input', 'reading', 'transcript'], label: 'Add prescription' },
   { key: ['review'], label: 'Check each medicine' },
   { key: ['card'], label: 'Print / share card' },
 ]

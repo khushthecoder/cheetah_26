@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { interpretFood, interpretFrequency } from './frequency.ts'
+import { findDoseTexts, interpretFood, interpretFrequency, isDoseOnlyLine } from './frequency.ts'
 import { emptyDoses, type Extraction, type Medicine } from './types.ts'
 
 /**
@@ -35,6 +35,21 @@ export const ModelOutputSchema = z.object({
     .transform((v) => v ?? []),
 })
 
+/**
+ * Generation settings shared by the app and the scripts. num_predict caps a runaway repetition loop
+ * (seen on a sideways photo: 98 s of "T. Vit" until the JSON broke); repeat_penalty discourages it.
+ */
+export const MODEL_OPTIONS = { temperature: 0, num_ctx: 4096, num_predict: 1200, repeat_penalty: 1.15 } as const
+
+/** Pass 1 for photos. Transcription only — the layout change (dose onto the medicine's line) is the one liberty allowed. */
+export const TRANSCRIBE_PROMPT = `Transcribe the medicines in this handwritten prescription, exactly as written.
+Write one medicine per line. If a dosing pattern (like 1-0-1 or 0-1-0) or a duration is written next to or
+directly below a medicine, put it on that medicine's line.
+Skip the clinic address, patient details, date and diagnosis.
+Write [?] for any word you cannot read. Do not correct spellings, explain, add or summarise anything.`
+
+export const TRANSCRIBE_OPTIONS = { temperature: 0, num_ctx: 4096, num_predict: 600, repeat_penalty: 1.15 } as const
+
 /** JSON schema handed to Ollama's structured-output `format` field (constrained decoding). */
 export const MODEL_JSON_SCHEMA = {
   type: 'object',
@@ -43,6 +58,7 @@ export const MODEL_JSON_SCHEMA = {
     doctor_name: { type: ['string', 'null'] },
     medicines: {
       type: 'array',
+      maxItems: 20,
       items: {
         type: 'object',
         properties: {
@@ -58,26 +74,31 @@ export const MODEL_JSON_SCHEMA = {
         required: ['name', 'strength', 'form', 'frequency_text', 'food_text', 'duration_text', 'instructions', 'confidence'],
       },
     },
-    unreadable: { type: 'array', items: { type: 'string' } },
+    unreadable: { type: 'array', items: { type: 'string' }, maxItems: 10 },
   },
   required: ['patient_name', 'doctor_name', 'medicines', 'unreadable'],
 } as const
 
-export const SYSTEM_PROMPT = `You read Indian doctor's prescriptions and copy the medicines into JSON.
+// No real medicine names in here: on an unreadable photo a small model will copy prompt examples
+// into its answer (it once returned "Telma 40 … with warm water" for a prescription without it).
+export const SYSTEM_PROMPT = `You read a doctor's prescription and copy the medicines into JSON.
 
 Rules:
-- Only include medicines that are actually written. Never add a medicine, never guess a name.
-- Copy the medicine name exactly as written (brand names like "Tab. Telma 40" -> name "Telma", strength "40 mg" if a unit is shown, else "40").
-- strength is only the number part (e.g. "40", "500 mg", "1"). Letters that are part of the brand ("Pan D", "Telma AM") belong in name, not strength.
-- form: tablet, capsule, syrup, drops, injection, inhaler, ointment, sachet — only if written or obvious from "Tab."/"Cap."/"Syp.".
-- frequency_text: copy the dosing text VERBATIM, e.g. "1-0-1", "BD", "TDS", "HS", "1 tab twice daily", "SOS". Do not translate or rewrite it.
-- food_text: copy any food instruction verbatim, e.g. "after food", "AC", "empty stomach". Empty if none.
-- duration_text: e.g. "5 days", "1 month", "continue". Empty if none.
-- instructions: any other written instruction for that medicine (e.g. "with warm water"). Empty if none.
-- confidence: "high" only if the name and dosing are clearly legible. "low" if you are unsure of any letter in the name.
-- unreadable: list any line that looks like a medicine but you could not read.
-- Ignore diagnoses, vitals, test advice, clinic address and phone numbers.
-- Do not give medical advice. Do not explain. Output JSON only.`
+- Only include medicines you can actually see written. Never add a medicine. Never guess a name.
+- If you cannot read the prescription, return an empty medicines list. That is a correct answer.
+- name: the medicine name exactly as written, without the "Tab."/"Cap."/"Syp."/"T." prefix.
+- strength: only the number part with its unit if written (like "500 mg", "2.5%", "0.05%"). Letters that belong to the brand stay in name.
+- form: tablet, capsule, syrup, drops, gel, cream, ointment, face wash, injection, sachet — only if written or clear from the prefix.
+- frequency_text: copy the dosing text exactly as written (number patterns like "1-0-1", or codes like BD, TDS, HS, OD, SOS, or words). Do not rewrite it.
+  Handwritten prescriptions often put the dosing pattern on the line directly below the medicine name — it still belongs to that medicine.
+- food_text: any food instruction exactly as written. Empty if none.
+- duration_text: how long, exactly as written. Empty if none.
+- instructions: any other written instruction for that medicine (like "apply at night", "local application"). Empty if none.
+- confidence: "high" only if name and dosing are clearly legible. "low" if you are unsure of any letter.
+- unreadable: each line that looks like a medicine but you could not read, listed once.
+- Ignore the clinic address, phone numbers, patient details, date, vitals and test advice.
+- Lines starting with "D:", "Dx", "C/O", "Diagnosis" or "Adv" are the diagnosis or advice, not medicines.
+- Do not give medical advice. Output JSON only.`
 
 export class ExtractionError extends Error {
   readonly kind: 'empty' | 'malformed' | 'nothing-found'
@@ -102,17 +123,17 @@ const words = (s: string) =>
  * For typed/pasted input we can check the model's transcription against what was actually entered.
  * A small model sometimes "corrects" a brand name into a different, real-looking drug — this catches it.
  */
-function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: string): string[] {
+function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: string, frequencyText: string): string[] {
   const source = words(sourceText)
   if (!source.trim()) return []
   const issues: string[] = []
-  const nameTokens = words(raw.name).trim().split(' ').filter((t) => t.length >= 3)
+  const nameTokens = nameTokensOf(raw.name)
   if (nameTokens.length > 0 && !nameTokens.some((t) => source.includes(` ${t} `))) {
     issues.push(`"${raw.name}" doesn't appear in the text you entered — the AI may have changed the spelling.`)
   }
   // Strength numbers are easy for a small model to invent ("Pan D" -> strength "1"), so the number
   // must appear on the same line as the medicine's name (whole text if we can't find the line).
-  const strengthNumbers = raw.strength.match(/\d+(?:\.\d+)?/g) ?? []
+  const strengthNumbers = findDoseTexts(raw.strength).length ? [] : (raw.strength.match(/\d+(?:\.\d+)?/g) ?? [])
   if (strengthNumbers.length > 0) {
     const lines = sourceText.split(/\n+/).map(words)
     const nameLines = lines.filter((l) => nameTokens.some((t) => l.includes(` ${t} `)))
@@ -122,11 +143,51 @@ function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: s
       issues.push(`Strength "${raw.strength}" doesn't appear next to ${raw.name} in the text you entered — check it against the paper.`)
     }
   }
-  const freq = words(raw.frequency_text)
+  const freq = words(frequencyText)
   if (freq.trim() && !source.includes(freq)) {
-    issues.push(`Dosing "${raw.frequency_text}" doesn't appear in the text you entered — check the timing.`)
+    issues.push(`Dosing "${frequencyText}" doesn't appear in the text you entered — check the timing.`)
   }
   return issues
+}
+
+/** Remove the "T."/"Tab." prefix and a dosing pattern the model copied into the name ("T. Vite 0-1-0" → "Vite"). */
+export function cleanName(name: string, frequencyText: string): string {
+  let n = name.replace(/^(tab|tablet|cap|capsule|syp|syrup|inj|t|c)\.?\s+/i, '')
+  const freq = frequencyText.trim()
+  if (freq && n.endsWith(freq)) n = n.slice(0, -freq.length)
+  n = n.replace(/\s+\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?\s*$/, '')
+  return n.trim() || name.trim()
+}
+
+const nameTokensOf = (name: string) =>
+  words(name)
+    .trim()
+    .split(' ')
+    .filter((t) => t.length >= 3 && !/^\d/.test(t))
+
+/**
+ * The dosing written next to this medicine in the source: on its own line, or on a dose-only line
+ * directly below it (common in handwriting). A small model pairing doses across lines put Zinc's
+ * "1-0-0" on Vit C in a real photo test, so the written position wins over the model's pairing.
+ * Lines naming more than one dose are ambiguous and skipped.
+ */
+export function anchoredDose(name: string, sourceText: string): string | null {
+  const tokens = nameTokensOf(name)
+  if (tokens.length === 0) return null
+  // Lines, plus sentences inside a line ("… khali pet. Shelcal 500 …"), so typed notes anchor per medicine.
+  const lines = sourceText
+    .split(/\n+|(?<=[a-z0-9)])\.\s+(?=[A-Z])/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  for (let i = 0; i < lines.length; i++) {
+    const line = words(lines[i])
+    if (!tokens.some((t) => line.includes(` ${t} `))) continue
+    const own = findDoseTexts(lines[i])
+    if (own.length === 1) return own[0]
+    if (own.length > 1) continue
+    if (i + 1 < lines.length && isDoseOnlyLine(lines[i + 1])) return findDoseTexts(lines[i + 1])[0]
+  }
+  return null
 }
 
 /**
@@ -135,9 +196,22 @@ function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: s
  * the model is never asked to guess (in our eval its own guesses were right only 9 of 23 times).
  */
 export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText = ''): Medicine {
-  const issues: string[] = groundingIssues(raw, sourceText)
-  const combined = [raw.frequency_text, raw.food_text, raw.instructions].filter(Boolean).join(' ')
-  const rule = interpretFrequency(raw.frequency_text) ?? (raw.instructions ? interpretFrequency(combined) : null)
+  let frequencyText = raw.frequency_text
+  const anchorIssues: string[] = []
+  const anchored = sourceText ? anchoredDose(raw.name, sourceText) : null
+  if (anchored && words(frequencyText).includes(words(anchored))) {
+    frequencyText = anchored // same dose, the model just copied extra words around it
+  } else if (anchored) {
+    anchorIssues.push(
+      frequencyText
+        ? `The AI paired this with "${frequencyText}", but "${anchored}" is written next to it — using that. Check the paper.`
+        : `Dose "${anchored}" is written next to this medicine — check the paper.`,
+    )
+    frequencyText = anchored
+  }
+  const issues: string[] = [...groundingIssues(raw, sourceText, frequencyText), ...anchorIssues]
+  const combined = [frequencyText, raw.food_text, raw.instructions].filter(Boolean).join(' ')
+  const rule = interpretFrequency(frequencyText) ?? (raw.instructions ? interpretFrequency(combined) : null)
 
   let doses = emptyDoses()
   let asNeeded = false
@@ -149,22 +223,23 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText 
     interpretedBy = 'rule'
     issues.push(...rule.notes)
   } else {
-    issues.push(raw.frequency_text ? `Couldn't decode "${raw.frequency_text}". Set the times by hand.` : 'No dosing found. Set the times by hand.')
+    issues.push(frequencyText ? `Couldn't decode "${frequencyText}". Set the times by hand.` : 'No dosing found. Set the times by hand.')
   }
 
   if (raw.confidence === 'low') issues.push('Name was hard to read — compare spelling with the paper.')
 
   return {
     id: newId(),
-    name: raw.name,
+    name: cleanName(raw.name, frequencyText),
     // A strength without any digit ("D" from "Pan D") is a split brand name, not a strength.
-    strength: /\d/.test(raw.strength) ? raw.strength : '',
+    // …and a dose pattern in the strength field ("1-0-0") is a misplaced dose, not a strength.
+    strength: /\d/.test(raw.strength) && findDoseTexts(raw.strength).length === 0 ? raw.strength : '',
     form: raw.form,
     doses,
     asNeeded,
-    food: interpretFood(`${raw.food_text} ${raw.frequency_text} ${raw.instructions}`),
+    food: interpretFood(`${raw.food_text} ${frequencyText} ${raw.instructions}`),
     duration: raw.duration_text,
-    frequencyText: raw.frequency_text,
+    frequencyText,
     instructions: raw.instructions,
     confidence: raw.confidence,
     interpretedBy,

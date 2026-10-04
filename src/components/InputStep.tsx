@@ -19,7 +19,7 @@ const MAX_PHOTOS = 3
 
 export function InputStep({ status, error, onSubmit }: Props) {
   const [text, setText] = useState('')
-  const [files, setFiles] = useState<{ file: File; url: string }[]>([])
+  const [files, setFiles] = useState<{ file: File; url: string; rotation: number }[]>([])
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -33,15 +33,16 @@ export function InputStep({ status, error, onSubmit }: Props) {
     const images = Array.from(list).filter((f) => f.type.startsWith('image/'))
     if (images.length < list.length) setLocalError('Only photos (JPG, PNG, HEIC) are supported.')
     else setLocalError(null)
-    setFiles((prev) => [...prev, ...images.map((file) => ({ file, url: URL.createObjectURL(file) }))].slice(0, MAX_PHOTOS))
+    setFiles((prev) => [...prev, ...images.map((file) => ({ file, url: URL.createObjectURL(file), rotation: 0 }))].slice(0, MAX_PHOTOS))
   }
 
   async function submit() {
     setBusy(true)
     setLocalError(null)
     try {
-      const images = await Promise.all(files.map((f) => fileToModelImage(f.file)))
-      onSubmit({ text, images, photoUrls: files.map((f) => f.url) })
+      const images = await Promise.all(files.map((f) => fileToModelImage(f.file, f.rotation)))
+      // Show the person exactly the image the model will see (rotated, downscaled).
+      onSubmit({ text, images, photoUrls: images.map((b64) => `data:image/jpeg;base64,${b64}`) })
     } catch (err) {
       setLocalError((err as Error).message)
     } finally {
@@ -91,7 +92,15 @@ export function InputStep({ status, error, onSubmit }: Props) {
           <div className="thumbs" onClick={(e) => e.stopPropagation()}>
             {files.map((f, i) => (
               <figure key={f.url} className="thumb">
-                <img src={f.url} alt={`Prescription page ${i + 1}`} />
+                <img src={f.url} alt={`Prescription page ${i + 1}`} style={{ transform: `rotate(${f.rotation}deg)` }} />
+                <button
+                  className="thumb-rotate"
+                  aria-label={`Rotate page ${i + 1}`}
+                  title="Rotate until the writing is upright"
+                  onClick={() => setFiles(files.map((x, j) => (j === i ? { ...x, rotation: (x.rotation + 90) % 360 } : x)))}
+                >
+                  ↻
+                </button>
                 <button
                   className="thumb-x"
                   aria-label={`Remove page ${i + 1}`}
@@ -104,6 +113,9 @@ export function InputStep({ status, error, onSubmit }: Props) {
                 </button>
               </figure>
             ))}
+            <p className="rotate-hint">
+              Is the writing upright? Tap <b>↻</b> until it is — a sideways photo makes the AI misread.
+            </p>
             {files.length < MAX_PHOTOS && (
               <button className="thumb add" onClick={() => inputRef.current?.click()}>
                 + page

@@ -56,7 +56,12 @@ export function ReviewStep({ patientName, onPatientName, medicines, onChange, un
       <aside className="source panel">
         <h3>The prescription</h3>
         {photoUrls.length > 0 ? (
-          photoUrls.map((u, i) => <img key={u} src={u} alt={`Prescription page ${i + 1}`} className="source-img" />)
+          <>
+            {photoUrls.map((u, i) => (
+              <img key={u.slice(-40)} src={u} alt={`Prescription page ${i + 1}`} className="source-img" />
+            ))}
+            <pre className="source-text">{sourceText}</pre>
+          </>
         ) : (
           <pre className="source-text">{sourceText}</pre>
         )}

@@ -15,7 +15,8 @@ export interface FrequencyResult {
   notes: string[]
 }
 
-const QTY = String.raw`(?:\d+(?:\.\d+)?|½|¼|¾|\d\/\d)`
+// A per-slot quantity is 0–4 units (or a fraction). Anything bigger is a strength ("500 — 1-0-1"), not a dose.
+const QTY = String.raw`(?:[0-4](?:\.\d+)?|½|¼|¾|[1-3]\/[2-4])`
 // 1-0-1, 1 0 1, 1/0/1 (3 slots) and 1-0-0-1 (4 slots).
 // The separator must be the same throughout (\2) and a quantity can't be glued to letters or digits,
 // so "M1 1-0-1" and "Telma 40 1-0-0" only match the real "1-0-1" / "1-0-0".
@@ -53,11 +54,33 @@ function withSlots(slots: Slot[], qty = '1'): SlotDoses {
 
 const has = (text: string, ...patterns: RegExp[]) => patterns.some((p) => p.test(text))
 
+const DOSE_CODE = /\b(od|bd|bid|tds|tid|qid|qds|hs|sos|prn)\b/gi
+const normalizeDashes = (s: string) => s.replace(/[–—−]/g, '-')
+
+/** Every dosing pattern ("1-0-1") or code ("BD", "HS") written in a piece of text, in order. */
+export function findDoseTexts(text: string): string[] {
+  const t = ` ${normalizeDashes(text)} `
+  const found: string[] = []
+  const global = new RegExp(SLOT_PATTERN.source, 'gi')
+  for (const m of t.matchAll(global)) found.push(m[0].replace(/^[^\d½¼¾]+/, '').trim())
+  if (found.length === 0) for (const m of t.matchAll(DOSE_CODE)) found.push(m[0])
+  return found
+}
+
+/** True when a line holds only dosing / duration, e.g. "1-0-0 x d" or "BD x 5 days" — a dose written below its medicine. */
+export function isDoseOnlyLine(line: string): boolean {
+  const doses = findDoseTexts(line)
+  if (doses.length !== 1) return false
+  const rest = normalizeDashes(line.toLowerCase())
+    .replace(doses[0].toLowerCase(), ' ')
+    .replace(/\b(x|for|days?|d|weeks?|wks?|months?|after|before|food|meals?|ac|pc)\b/g, ' ')
+    .replace(/[\d\s\-.,/()×*]+/g, '')
+  return rest.length === 0
+}
+
 /** Returns null when the text cannot be interpreted with confidence. */
 export function interpretFrequency(input: string): FrequencyResult | null {
-  const text = ` ${input
-    .toLowerCase()
-    .replace(/[–—−]/g, '-')
+  const text = ` ${normalizeDashes(input.toLowerCase())
     .replace(/\s+/g, ' ')
     .trim()} `
   if (!text.trim()) return null
