@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { interpretFood, interpretFrequency } from './frequency.ts'
-import { emptyDoses, SLOTS, type Extraction, type Medicine, type Slot } from './types.ts'
+import { emptyDoses, type Extraction, type Medicine } from './types.ts'
 
 /**
  * What we ask the model for. The model's job is narrow: *read* the prescription and copy
@@ -19,10 +19,6 @@ export const ModelMedicineSchema = z.object({
   food_text: nullableText,
   duration_text: nullableText,
   instructions: nullableText,
-  model_slots: z
-    .array(z.string())
-    .nullish()
-    .transform((v) => (v ?? []).map((s) => s.toLowerCase().trim()).filter((s): s is Slot => (SLOTS as readonly string[]).includes(s))),
   confidence: z
     .string()
     .nullish()
@@ -57,10 +53,9 @@ export const MODEL_JSON_SCHEMA = {
           food_text: { type: ['string', 'null'] },
           duration_text: { type: ['string', 'null'] },
           instructions: { type: ['string', 'null'] },
-          model_slots: { type: 'array', items: { type: 'string', enum: [...SLOTS] } },
           confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
         },
-        required: ['name', 'strength', 'form', 'frequency_text', 'food_text', 'duration_text', 'instructions', 'model_slots', 'confidence'],
+        required: ['name', 'strength', 'form', 'frequency_text', 'food_text', 'duration_text', 'instructions', 'confidence'],
       },
     },
     unreadable: { type: 'array', items: { type: 'string' } },
@@ -73,23 +68,22 @@ export const SYSTEM_PROMPT = `You read Indian doctor's prescriptions and copy th
 Rules:
 - Only include medicines that are actually written. Never add a medicine, never guess a name.
 - Copy the medicine name exactly as written (brand names like "Tab. Telma 40" -> name "Telma", strength "40 mg" if a unit is shown, else "40").
+- strength is only the number part (e.g. "40", "500 mg", "1"). Letters that are part of the brand ("Pan D", "Telma AM") belong in name, not strength.
 - form: tablet, capsule, syrup, drops, injection, inhaler, ointment, sachet — only if written or obvious from "Tab."/"Cap."/"Syp.".
 - frequency_text: copy the dosing text VERBATIM, e.g. "1-0-1", "BD", "TDS", "HS", "1 tab twice daily", "SOS". Do not translate or rewrite it.
 - food_text: copy any food instruction verbatim, e.g. "after food", "AC", "empty stomach". Empty if none.
 - duration_text: e.g. "5 days", "1 month", "continue". Empty if none.
 - instructions: any other written instruction for that medicine (e.g. "with warm water"). Empty if none.
-- model_slots: your best reading of when to take it, using only: morning, afternoon, evening, night.
 - confidence: "high" only if the name and dosing are clearly legible. "low" if you are unsure of any letter in the name.
 - unreadable: list any line that looks like a medicine but you could not read.
 - Ignore diagnoses, vitals, test advice, clinic address and phone numbers.
 - Do not give medical advice. Do not explain. Output JSON only.`
 
 export class ExtractionError extends Error {
-  constructor(
-    message: string,
-    readonly kind: 'empty' | 'malformed' | 'nothing-found',
-  ) {
+  readonly kind: 'empty' | 'malformed' | 'nothing-found'
+  constructor(message: string, kind: 'empty' | 'malformed' | 'nothing-found') {
     super(message)
+    this.kind = kind
   }
 }
 
@@ -116,6 +110,18 @@ function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: s
   if (nameTokens.length > 0 && !nameTokens.some((t) => source.includes(` ${t} `))) {
     issues.push(`"${raw.name}" doesn't appear in the text you entered — the AI may have changed the spelling.`)
   }
+  // Strength numbers are easy for a small model to invent ("Pan D" -> strength "1"), so the number
+  // must appear on the same line as the medicine's name (whole text if we can't find the line).
+  const strengthNumbers = raw.strength.match(/\d+(?:\.\d+)?/g) ?? []
+  if (strengthNumbers.length > 0) {
+    const lines = sourceText.split(/\n+/).map(words)
+    const nameLines = lines.filter((l) => nameTokens.some((t) => l.includes(` ${t} `)))
+    const scope = nameLines.length ? nameLines.join(' ') : source
+    const written = (n: string) => new RegExp(` ${n.replace('.', '\\.')}(?:mg|mcg|ml|g|k|iu)? `).test(scope)
+    if (!strengthNumbers.every(written)) {
+      issues.push(`Strength "${raw.strength}" doesn't appear next to ${raw.name} in the text you entered — check it against the paper.`)
+    }
+  }
   const freq = words(raw.frequency_text)
   if (freq.trim() && !source.includes(freq)) {
     issues.push(`Dosing "${raw.frequency_text}" doesn't appear in the text you entered — check the timing.`)
@@ -123,9 +129,11 @@ function groundingIssues(raw: z.infer<typeof ModelMedicineSchema>, sourceText: s
   return issues
 }
 
-const sameSlots = (a: Slot[], b: Slot[]) => a.length === b.length && a.every((s) => b.includes(s))
-
-/** Turn one validated model row into a Medicine, preferring deterministic rules over the model's guess. */
+/**
+ * Turn one validated model row into a Medicine. The schedule comes only from deterministic rules
+ * applied to the text the model copied. If the rules can't decode it, the human sets the times —
+ * the model is never asked to guess (in our eval its own guesses were right only 9 of 23 times).
+ */
 export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText = ''): Medicine {
   const issues: string[] = groundingIssues(raw, sourceText)
   const combined = [raw.frequency_text, raw.food_text, raw.instructions].filter(Boolean).join(' ')
@@ -140,19 +148,6 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText 
     asNeeded = rule.asNeeded
     interpretedBy = 'rule'
     issues.push(...rule.notes)
-    // Second opinion: if the model read the timing differently, a human should look closely.
-    const ruleSlots = SLOTS.filter((s) => rule.doses[s])
-    if (!rule.asNeeded && raw.model_slots.length > 0 && !sameSlots(ruleSlots, raw.model_slots)) {
-      issues.push(`The AI read the timing differently (${raw.model_slots.join(', ')}). Check against the paper.`)
-    }
-  } else if (raw.model_slots.length > 0) {
-    for (const s of raw.model_slots) doses[s] = '1'
-    interpretedBy = 'model'
-    issues.push(
-      raw.frequency_text
-        ? `Couldn't decode "${raw.frequency_text}" with certainty — times are the AI's guess.`
-        : 'No dosing written — times are the AI’s guess.',
-    )
   } else {
     issues.push(raw.frequency_text ? `Couldn't decode "${raw.frequency_text}". Set the times by hand.` : 'No dosing found. Set the times by hand.')
   }
@@ -162,7 +157,8 @@ export function toMedicine(raw: z.infer<typeof ModelMedicineSchema>, sourceText 
   return {
     id: newId(),
     name: raw.name,
-    strength: raw.strength,
+    // A strength without any digit ("D" from "Pan D") is a split brand name, not a strength.
+    strength: /\d/.test(raw.strength) ? raw.strength : '',
     form: raw.form,
     doses,
     asNeeded,

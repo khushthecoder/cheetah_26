@@ -4,8 +4,8 @@ export type Slot = (typeof SLOTS)[number]
 export type Food = 'before' | 'after' | 'with' | 'any'
 export type Confidence = 'high' | 'medium' | 'low'
 
-/** How the dosing schedule was decided. Rules are preferred over the model. */
-export type InterpretedBy = 'rule' | 'model' | 'manual' | 'none'
+/** How the dosing schedule was decided. The model never decides it. */
+export type InterpretedBy = 'rule' | 'manual' | 'none'
 
 /** Quantity to take in each slot, e.g. "1" or "½". null = nothing in that slot. */
 export type SlotDoses = Record<Slot, string | null>

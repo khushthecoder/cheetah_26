@@ -24,3 +24,11 @@ describe('toWhatsAppText', () => {
     expect(text).not.toMatch(/Glycomet 40 — continue/)
   })
 })
+
+describe('as-needed medicines with a time', () => {
+  it('are listed only under "when needed", never in the daily slots', () => {
+    const text = toWhatsAppText('', [med({ name: 'Cetirizine', strength: '10', asNeeded: true, doses: { ...emptyDoses(), night: '1' }, instructions: 'if itching' })])
+    expect(text).not.toContain('*Night')
+    expect(text).toContain('*Only when needed*\n• Cetirizine 10 (night) — if itching')
+  })
+})

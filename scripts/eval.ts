@@ -4,9 +4,11 @@
  *   npm run eval                      # default model
  *   npm run eval -- gemma3:4b         # compare another model
  *
- * Compares two ways of deciding *when* to take each medicine:
- *   - model:  the model's own `model_slots` guess
- *   - rules:  DoseCard's pipeline (deterministic frequency.ts, model guess only as fallback)
+ * For every expected medicine it checks: did the model find it, did it copy the dosing text
+ * faithfully, and does DoseCard's deterministic decoder turn that into the right schedule.
+ * A medicine left for the human ("set the times by hand") counts as safe-but-not-decoded, not wrong.
+ *
+ * Baseline from the earlier design, where the model also guessed times: eval/baseline-with-model-slots.json
  */
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { MODEL_JSON_SCHEMA, ModelMedicineSchema, ModelOutputSchema, SYSTEM_PROMPT, toMedicine } from '../src/lib/extract.ts'
@@ -25,6 +27,7 @@ interface Case {
 }
 
 const model = process.argv[2] || process.env.VITE_MODEL || 'gemma4:e2b-it-qat'
+const label = process.argv[3] || 'latest'
 const baseUrl = process.env.OLLAMA_URL || 'http://127.0.0.1:11434'
 const cases = JSON.parse(await readFile(new URL('../samples/eval-cases.json', import.meta.url), 'utf8')) as Case[]
 
@@ -57,9 +60,9 @@ async function run(c: Case) {
   })
 
   let found = 0
-  let modelCorrect = 0
-  let rulesCorrect = 0
-  let byRule = 0
+  let correct = 0
+  let wrong = 0
+  let leftForHuman = 0
   const details: string[] = []
   for (const exp of c.expected) {
     const row = rows.find((r) => r.name.toLowerCase().includes(exp.name))
@@ -70,20 +73,21 @@ async function run(c: Case) {
     found++
     const med = toMedicine(row)
     const pipelineSlots = SLOTS.filter((s) => med.doses[s])
-    const modelOk = sameSlots(row.model_slots, exp.slots)
-    const rulesOk = sameSlots(pipelineSlots, exp.slots) && (exp.asNeeded ?? false) === med.asNeeded
-    if (med.interpretedBy === 'rule') byRule++
-    if (modelOk) modelCorrect++
-    if (rulesOk) rulesCorrect++
+    const blank = pipelineSlots.length === 0 && !med.asNeeded
+    const ok = sameSlots(pipelineSlots, exp.slots) && (exp.asNeeded ?? false) === med.asNeeded
+    const mark = ok ? '✓' : blank ? '◦' : '✗'
+    if (ok) correct++
+    else if (blank) leftForHuman++
+    else wrong++
     details.push(
-      `  ${rulesOk ? '✓' : '✗'} ${row.name.padEnd(16)} written "${row.frequency_text}" → model:[${row.model_slots.join(',')}] dosecard:[${pipelineSlots.join(',')}${med.asNeeded ? ',SOS' : ''}] (${med.interpretedBy}) expected:[${exp.slots.join(',')}${exp.asNeeded ? ',SOS' : ''}]`,
+      `  ${mark} ${row.name.padEnd(16)} written "${row.frequency_text}" → dosecard:[${pipelineSlots.join(',')}${med.asNeeded ? ',SOS' : ''}] (${med.interpretedBy}) expected:[${exp.slots.join(',')}${exp.asNeeded ? ',SOS' : ''}]${med.issues.length ? `  ⚠ ${med.issues.join(' / ')}` : ''}`,
     )
   }
   const extra = rows.filter((r) => !c.expected.some((e) => r.name.toLowerCase().includes(e.name)))
   for (const r of extra) details.push(`  ! extra row "${r.name}" (hallucinated or split)`)
 
   const tokPerSec = data.eval_count && data.eval_duration ? data.eval_count / (data.eval_duration / 1e9) : 0
-  return { id: c.id, expected: c.expected.length, found, extra: extra.length, modelCorrect, rulesCorrect, byRule, ms, tokPerSec, details }
+  return { id: c.id, expected: c.expected.length, found, extra: extra.length, correct, wrong, leftForHuman, ms, tokPerSec, details }
 }
 
 console.log(`Model: ${model}\n`)
@@ -94,25 +98,25 @@ for (const c of cases) {
   try {
     const r = await run(c)
     results.push(r)
-    console.log(`${c.id} (${(r.ms / 1000).toFixed(1)}s, ${r.tokPerSec.toFixed(1)} tok/s): found ${r.found}/${r.expected}, schedule model ${r.modelCorrect}/${r.found} vs dosecard ${r.rulesCorrect}/${r.found}`)
+    console.log(`${c.id} (${(r.ms / 1000).toFixed(1)}s, ${r.tokPerSec.toFixed(1)} tok/s): found ${r.found}/${r.expected}, correct ${r.correct}, wrong ${r.wrong}, left for human ${r.leftForHuman}`)
     console.log(r.details.join('\n') + '\n')
   } catch (err) {
     console.log(`${c.id}: FAILED — ${(err as Error).message}\n`)
   }
 }
 
-const sum = (k: 'expected' | 'found' | 'extra' | 'modelCorrect' | 'rulesCorrect' | 'byRule') => results.reduce((a, r) => a + r[k], 0)
+const sum = (k: 'expected' | 'found' | 'extra' | 'correct' | 'wrong' | 'leftForHuman') => results.reduce((a, r) => a + r[k], 0)
 const summary = {
   model,
   cases: results.length,
   medicines: sum('expected'),
   found: sum('found'),
   extraRows: sum('extra'),
-  scheduleCorrectModelOnly: sum('modelCorrect'),
-  scheduleCorrectDoseCard: sum('rulesCorrect'),
-  decodedByRules: sum('byRule'),
+  scheduleCorrect: sum('correct'),
+  scheduleWrong: sum('wrong'),
+  leftForHuman: sum('leftForHuman'),
   avgSeconds: +(results.reduce((a, r) => a + r.ms, 0) / results.length / 1000).toFixed(1),
 }
 console.log('SUMMARY', summary)
-await mkdir(new URL('../eval-results/', import.meta.url), { recursive: true })
-await writeFile(new URL(`../eval-results/${model.replace(/[^a-z0-9.-]/gi, '_')}.json`, import.meta.url), JSON.stringify({ summary, results }, null, 2))
+await mkdir(new URL('../eval/', import.meta.url), { recursive: true })
+await writeFile(new URL(`../eval/${model.replace(/[^a-z0-9.-]/gi, '_')}-${label}.json`, import.meta.url), JSON.stringify({ summary, results }, null, 2))

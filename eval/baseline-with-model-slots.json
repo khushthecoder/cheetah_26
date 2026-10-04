@@ -1,0 +1,103 @@
+{
+  "summary": {
+    "model": "gemma4:e2b-it-qat",
+    "cases": 5,
+    "medicines": 23,
+    "found": 23,
+    "extraRows": 0,
+    "scheduleCorrectModelOnly": 9,
+    "scheduleCorrectDoseCard": 21,
+    "decodedByRules": 22,
+    "avgSeconds": 15.2
+  },
+  "results": [
+    {
+      "id": "gp-classic",
+      "expected": 6,
+      "found": 6,
+      "extra": 0,
+      "modelCorrect": 2,
+      "rulesCorrect": 6,
+      "byRule": 6,
+      "ms": 11705.262542,
+      "tokPerSec": 38.43685401891838,
+      "details": [
+        "  ✓ Telma            written \"1-0-0\" → model:[morning] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Glycomet GP      written \"1-0-1\" → model:[morning] dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Ecosprin         written \"0-0-1\" → model:[evening] dosecard:[night] (rule) expected:[night]",
+        "  ✓ Rosuvas          written \"HS\" → model:[morning] dosecard:[night] (rule) expected:[night]",
+        "  ✓ Pan D            written \"OD\" → model:[morning] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Dolo             written \"SOS\" → model:[night] dosecard:[,SOS] (rule) expected:[,SOS]"
+      ]
+    },
+    {
+      "id": "latin-abbrev",
+      "expected": 5,
+      "found": 5,
+      "extra": 0,
+      "modelCorrect": 2,
+      "rulesCorrect": 5,
+      "byRule": 5,
+      "ms": 19296.053,
+      "tokPerSec": 29.88624506918009,
+      "details": [
+        "  ✓ Amlodac          written \"OD\" → model:[morning,night] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Metolar          written \"BD\" → model:[morning,night] dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Atorva           written \"HS\" → model:[morning,afternoon,evening] dosecard:[night] (rule) expected:[night]",
+        "  ✓ Cremaffin        written \"HS\" → model:[morning,afternoon,evening] dosecard:[night] (rule) expected:[night]",
+        "  ✓ Shelcal          written \"BD\" → model:[morning,night] dosecard:[morning,night] (rule) expected:[morning,night]"
+      ]
+    },
+    {
+      "id": "spoken",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "modelCorrect": 2,
+      "rulesCorrect": 3,
+      "byRule": 3,
+      "ms": 22593.311958,
+      "tokPerSec": 31.624434869268335,
+      "details": [
+        "  ✓ Azithral         written \"once a day\" → model:[morning] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Montair LC       written \"at night\" → model:[night] dosecard:[night] (rule) expected:[night]",
+        "  ✗ Dolo             written \"only if fever goes above 100\" → model:[afternoon] dosecard:[afternoon] (model) expected:[,SOS]",
+        "  ✓ Benadryl         written \"three times a day\" → model:[afternoon,evening,night] dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]"
+      ]
+    },
+    {
+      "id": "hinglish",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "modelCorrect": 3,
+      "rulesCorrect": 3,
+      "byRule": 4,
+      "ms": 12289.072957999997,
+      "tokPerSec": 37.04303882714295,
+      "details": [
+        "  ✓ Thyronorm        written \"subah khali pet\" → model:[morning] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Shelcal          written \"dopahar khane ke baad\" → model:[afternoon] dosecard:[afternoon] (rule) expected:[afternoon]",
+        "  ✓ Telma            written \"AM 1-0-0\" → model:[morning] dosecard:[morning] (rule) expected:[morning]",
+        "  ✗ Glimisave        written \"M1 1-0-1\" → model:[morning] dosecard:[morning,afternoon,night] (rule) expected:[morning,night]"
+      ]
+    },
+    {
+      "id": "four-slot",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "modelCorrect": 0,
+      "rulesCorrect": 4,
+      "byRule": 4,
+      "ms": 10238.813374999998,
+      "tokPerSec": 41.01845842587899,
+      "details": [
+        "  ✓ Augmentin        written \"1-0-0-1\" → model:[morning,afternoon,evening,night] dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Zerodol SP       written \"1-0-1\" → model:[morning,afternoon,evening,night] dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Omez             written \"1-0-0\" → model:[morning,afternoon,evening,night] dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Lonazep          written \"0-0-½\" → model:[morning,afternoon,evening,night] dosecard:[night] (rule) expected:[night]"
+      ]
+    }
+  ]
+}

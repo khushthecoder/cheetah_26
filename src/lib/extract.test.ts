@@ -10,7 +10,6 @@ const row = (over: Record<string, unknown> = {}) => ({
   food_text: 'after food',
   duration_text: '1 month',
   instructions: null,
-  model_slots: ['morning'],
   confidence: 'high',
   ...over,
 })
@@ -31,18 +30,26 @@ describe('parseModelOutput', () => {
     expect(m.checked).toBe(false)
   })
 
-  it('prefers the deterministic rule over a wrong model guess', () => {
-    const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1', model_slots: ['afternoon'] })])).medicines
-    expect(m.doses.morning).toBe('1')
-    expect(m.doses.night).toBe('1')
-    expect(m.doses.afternoon).toBeNull()
+  it('decodes the schedule from the copied dosing text', () => {
+    const [m] = parseModelOutput(output([row({ frequency_text: '1-0-1' })])).medicines
+    expect(m.doses).toEqual({ morning: '1', afternoon: null, evening: null, night: '1' })
   })
 
-  it('falls back to the model guess and flags it when the dosing text is unknown', () => {
+  it('never guesses times when the dosing text cannot be decoded', () => {
     const [m] = parseModelOutput(output([row({ frequency_text: 'as directed', model_slots: ['night'] })])).medicines
-    expect(m.interpretedBy).toBe('model')
-    expect(m.doses.night).toBe('1')
-    expect(m.issues.join(' ')).toMatch(/AI's guess/)
+    expect(m.interpretedBy).toBe('none')
+    expect(Object.values(m.doses).every((v) => v === null)).toBe(true)
+    expect(m.issues.join(' ')).toMatch(/Set the times by hand/)
+  })
+
+  it('drops a "strength" with no number (split brand name like "Pan D")', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Pan D', strength: 'D' })])).medicines
+    expect(m.strength).toBe('')
+  })
+
+  it('decodes "only if fever" from the dosing text as as-needed', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Dolo', frequency_text: 'only if fever goes above 100' })])).medicines
+    expect(m.asNeeded).toBe(true)
   })
 
   it('flags low-confidence names', () => {
@@ -51,7 +58,7 @@ describe('parseModelOutput', () => {
   })
 
   it('tolerates code fences, nulls and junk confidence values', () => {
-    const content = '```json\n' + output([row({ strength: null, form: undefined, confidence: 'very sure', model_slots: null })]) + '\n```'
+    const content = '```json\n' + output([row({ strength: null, form: undefined, confidence: 'very sure' })]) + '\n```'
     const [m] = parseModelOutput(content).medicines
     expect(m.strength).toBe('')
     expect(m.confidence).toBe('low')
@@ -141,12 +148,6 @@ describe('safety checks', () => {
     expect(m.issues.join(' ')).toMatch(/Dosing "1-0-1" doesn't appear/)
   })
 
-  it('flags disagreement between the rule decoder and the model', () => {
-    const [m] = parseModelOutput(output([row({ model_slots: ['night'] })])).medicines
-    expect(m.doses.morning).toBe('1')
-    expect(m.issues.join(' ')).toMatch(/read the timing differently/)
-  })
-
   it('skips grounding when there is no source text (photo input)', () => {
     const [m] = parseModelOutput(output([row({ name: 'Anything' })]), '').medicines
     expect(m.issues).toEqual([])
@@ -160,7 +161,19 @@ describe('grounding matches whole words', () => {
   })
 
   it('tolerates spacing and punctuation differences', () => {
-    const [m] = parseModelOutput(output([row({ name: 'Glycomet GP', frequency_text: '1-0-1', model_slots: ['morning', 'night'] })]), 'Tab.Glycomet-GP 1   1 - 0 - 1').medicines
+    const [m] = parseModelOutput(output([row({ name: 'Glycomet GP', strength: '1', frequency_text: '1-0-1' })]), 'Tab.Glycomet-GP 1   1 - 0 - 1').medicines
     expect(m.issues).toEqual([])
+  })
+})
+
+describe('strength grounding (live run regression)', () => {
+  const source = 'Cap. Pan D   OD  empty stomach\nTab. Telma 40mg 1-0-0\nT. Vitamin D3 60K'
+  it('flags a strength the model invented', () => {
+    const [m] = parseModelOutput(output([row({ name: 'Pan D', strength: '1', frequency_text: 'OD' })]), source).medicines
+    expect(m.issues.join(' ')).toMatch(/Strength "1" doesn't appear next to Pan D/)
+  })
+  it('accepts strengths written with or without a unit', () => {
+    const meds = parseModelOutput(output([row({ name: 'Telma', strength: '40 mg', frequency_text: '1-0-0' }), row({ name: 'Vitamin D3', strength: '60K', frequency_text: '' })]), source).medicines
+    expect(meds.flatMap((m) => m.issues).filter((i) => i.startsWith('Strength'))).toEqual([])
   })
 })

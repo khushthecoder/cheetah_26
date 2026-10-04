@@ -1,0 +1,103 @@
+{
+  "summary": {
+    "model": "gemma4:e2b-it-qat",
+    "cases": 5,
+    "medicines": 23,
+    "found": 23,
+    "extraRows": 0,
+    "scheduleCorrect": 21,
+    "scheduleWrong": 0,
+    "leftForHuman": 2,
+    "avgSeconds": 9
+  },
+  "results": [
+    {
+      "id": "gp-classic",
+      "expected": 6,
+      "found": 6,
+      "extra": 0,
+      "correct": 5,
+      "wrong": 0,
+      "leftForHuman": 1,
+      "ms": 10685.607875,
+      "tokPerSec": 43.15068886172844,
+      "details": [
+        "  ✓ Telma            written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Glycomet GP      written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Ecosprin         written \"0-0-1\" → dosecard:[night] (rule) expected:[night]",
+        "  ✓ Rosuvas          written \"HS\" → dosecard:[night] (rule) expected:[night]",
+        "  ◦ Pan D            written \"OD\" → dosecard:[] (rule) expected:[morning]  ⚠ Once a day, but the time isn't written. Tap the time the doctor told you.",
+        "  ✓ Dolo             written \"SOS\" → dosecard:[,SOS] (rule) expected:[,SOS]"
+      ]
+    },
+    {
+      "id": "latin-abbrev",
+      "expected": 5,
+      "found": 5,
+      "extra": 0,
+      "correct": 4,
+      "wrong": 0,
+      "leftForHuman": 1,
+      "ms": 10086.086292000002,
+      "tokPerSec": 33.26923169524683,
+      "details": [
+        "  ◦ Amlodac          written \"OD\" → dosecard:[] (rule) expected:[morning]  ⚠ Once a day, but the time isn't written. Tap the time the doctor told you.",
+        "  ✓ Metolar XR       written \"BD\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Atorva           written \"HS\" → dosecard:[night] (rule) expected:[night]",
+        "  ✓ Cremaffin        written \"HS\" → dosecard:[night] (rule) expected:[night]",
+        "  ✓ Shelcal          written \"BD\" → dosecard:[morning,night] (rule) expected:[morning,night]"
+      ]
+    },
+    {
+      "id": "spoken",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "correct": 4,
+      "wrong": 0,
+      "leftForHuman": 0,
+      "ms": 9477.699417,
+      "tokPerSec": 36.31260673266633,
+      "details": [
+        "  ✓ Azithral         written \"once a day in the morning\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Montair LC       written \"at night\" → dosecard:[night] (rule) expected:[night]",
+        "  ✓ Dolo             written \"only if fever goes above 100\" → dosecard:[,SOS] (rule) expected:[,SOS]",
+        "  ✓ Benadryl         written \"three times a day\" → dosecard:[morning,afternoon,night] (rule) expected:[morning,afternoon,night]"
+      ]
+    },
+    {
+      "id": "hinglish",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "correct": 4,
+      "wrong": 0,
+      "leftForHuman": 0,
+      "ms": 7555.837667,
+      "tokPerSec": 41.94554650352828,
+      "details": [
+        "  ✓ Thyronorm        written \"subah khali pet\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Shelcal          written \"dopahar khane ke baad\" → dosecard:[afternoon] (rule) expected:[afternoon]",
+        "  ✓ Telma AM         written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Glimisave M1     written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]"
+      ]
+    },
+    {
+      "id": "four-slot",
+      "expected": 4,
+      "found": 4,
+      "extra": 0,
+      "correct": 4,
+      "wrong": 0,
+      "leftForHuman": 0,
+      "ms": 6947.721583999999,
+      "tokPerSec": 44.31720917362959,
+      "details": [
+        "  ✓ Augmentin        written \"1-0-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Zerodol SP       written \"1-0-1\" → dosecard:[morning,night] (rule) expected:[morning,night]",
+        "  ✓ Omez             written \"1-0-0\" → dosecard:[morning] (rule) expected:[morning]",
+        "  ✓ Lonazep          written \"0-0-½\" → dosecard:[night] (rule) expected:[night]"
+      ]
+    }
+  ]
+}

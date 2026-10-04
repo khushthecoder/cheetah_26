@@ -26,7 +26,7 @@ export function ReviewStep({ patientName, onPatientName, medicines, onChange, un
   function cycleSlot(m: Medicine, slot: Slot) {
     const i = QTY_CYCLE.indexOf(m.doses[slot] as (typeof QTY_CYCLE)[number])
     const next = QTY_CYCLE[(i + 1) % QTY_CYCLE.length]
-    update(m.id, { doses: { ...m.doses, [slot]: next }, interpretedBy: 'manual', asNeeded: false })
+    update(m.id, { doses: { ...m.doses, [slot]: next }, interpretedBy: 'manual' })
   }
 
   function addMedicine() {
@@ -112,7 +112,6 @@ export function ReviewStep({ patientName, onPatientName, medicines, onChange, un
                 <p className="as-written">
                   Written as <span className="mono">{m.frequencyText}</span>
                   {m.interpretedBy === 'rule' && <span className="tag">decoded by rules</span>}
-                  {m.interpretedBy === 'model' && <span className="tag warn">AI guess</span>}
                 </p>
               )}
 

@@ -7,11 +7,10 @@ export const DEFAULT_BASE_URL = '/ollama'
 const TIMEOUT_MS = 180_000
 
 export class OllamaError extends Error {
-  constructor(
-    message: string,
-    readonly kind: 'offline' | 'missing-model' | 'timeout' | 'server' | 'aborted',
-  ) {
+  readonly kind: 'offline' | 'missing-model' | 'timeout' | 'server' | 'aborted'
+  constructor(message: string, kind: 'offline' | 'missing-model' | 'timeout' | 'server' | 'aborted') {
     super(message)
+    this.kind = kind
   }
 }
 

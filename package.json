@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "eval": "node scripts/eval.ts"
+    "eval": "node scripts/eval.ts",
+    "read": "node scripts/read.ts"
   },
   "dependencies": {
     "react": "^19.3.0",

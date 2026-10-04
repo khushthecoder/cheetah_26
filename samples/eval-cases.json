@@ -4,12 +4,42 @@
     "note": "Typical Indian GP prescription with dash notation and abbreviations",
     "text": "Dr. A. Sharma  MBBS, MD (Medicine)\nPt: Mrs. Kamla Devi   68/F     4/10/26\nDx: HTN, T2DM\n\nRx\n1) Tab. Telma 40        1-0-0   after breakfast   x 1 month\n2) Tab. Glycomet GP 1   1-0-1   before food       continue\n3) Tab. Ecosprin 75     0-0-1   after dinner\n4) Tab. Rosuvas 10      HS\n5) Cap. Pan D           OD  empty stomach   x 15 days\n6) Tab. Dolo 650        SOS for fever\n\nReview after 1 month with FBS, PPBS, HbA1c",
     "expected": [
-      { "name": "telma", "slots": ["morning"] },
-      { "name": "glycomet", "slots": ["morning", "night"] },
-      { "name": "ecosprin", "slots": ["night"] },
-      { "name": "rosuvas", "slots": ["night"] },
-      { "name": "pan", "slots": ["morning"] },
-      { "name": "dolo", "slots": [], "asNeeded": true }
+      {
+        "name": "telma",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "glycomet",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "ecosprin",
+        "slots": [
+          "night"
+        ]
+      },
+      {
+        "name": "rosuvas",
+        "slots": [
+          "night"
+        ]
+      },
+      {
+        "name": "pan",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "dolo",
+        "slots": [],
+        "asNeeded": true
+      }
     ]
   },
   {
@@ -17,11 +47,38 @@
     "note": "Latin frequency codes only",
     "text": "Rx\nT. Amlodac 5 mg  OD\nT. Metolar XR 25  BD\nT. Atorva 10  HS\nSyp. Cremaffin 15 ml  HS\nT. Shelcal 500  BD PC",
     "expected": [
-      { "name": "amlodac", "slots": ["morning"] },
-      { "name": "metolar", "slots": ["morning", "night"] },
-      { "name": "atorva", "slots": ["night"] },
-      { "name": "cremaffin", "slots": ["night"] },
-      { "name": "shelcal", "slots": ["morning", "night"] }
+      {
+        "name": "amlodac",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "metolar",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "atorva",
+        "slots": [
+          "night"
+        ]
+      },
+      {
+        "name": "cremaffin",
+        "slots": [
+          "night"
+        ]
+      },
+      {
+        "name": "shelcal",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      }
     ]
   },
   {
@@ -29,10 +86,31 @@
     "note": "Instructions as a family member typed them after the visit",
     "text": "Doctor said: Azithral 500 once a day in the morning for 3 days after food. Montair LC one tablet at night for 5 days. Dolo 650 only if fever goes above 100. Benadryl syrup 2 spoons three times a day.",
     "expected": [
-      { "name": "azithral", "slots": ["morning"] },
-      { "name": "montair", "slots": ["night"] },
-      { "name": "dolo", "slots": [], "asNeeded": true },
-      { "name": "benadryl", "slots": ["morning", "afternoon", "night"] }
+      {
+        "name": "azithral",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "montair",
+        "slots": [
+          "night"
+        ]
+      },
+      {
+        "name": "dolo",
+        "slots": [],
+        "asNeeded": true
+      },
+      {
+        "name": "benadryl",
+        "slots": [
+          "morning",
+          "afternoon",
+          "night"
+        ]
+      }
     ]
   },
   {
@@ -40,10 +118,31 @@
     "note": "Hinglish WhatsApp message from a sibling",
     "text": "bhai doctor ne bola hai: Thyronorm 50 subah khali pet. Shelcal 500 dopahar khane ke baad. Telma AM 1-0-0. Glimisave M1 1-0-1 khane se pehle.",
     "expected": [
-      { "name": "thyronorm", "slots": ["morning"] },
-      { "name": "shelcal", "slots": ["afternoon"] },
-      { "name": "telma", "slots": ["morning"] },
-      { "name": "glimisave", "slots": ["morning", "night"] }
+      {
+        "name": "thyronorm",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "shelcal",
+        "slots": [
+          "afternoon"
+        ]
+      },
+      {
+        "name": "telma",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "glimisave",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      }
     ]
   },
   {
@@ -51,10 +150,126 @@
     "note": "Four-slot notation and half tablets",
     "text": "1. Tab Augmentin 625   1-0-0-1  x 5 days\n2. Tab Zerodol SP   1-0-1  after food  x 5 days\n3. Cap Omez 20   1-0-0  before breakfast\n4. Tab Lonazep 0.25   0-0-½",
     "expected": [
-      { "name": "augmentin", "slots": ["morning", "night"] },
-      { "name": "zerodol", "slots": ["morning", "night"] },
-      { "name": "omez", "slots": ["morning"] },
-      { "name": "lonazep", "slots": ["night"] }
+      {
+        "name": "augmentin",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "zerodol",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "omez",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "lonazep",
+        "slots": [
+          "night"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "heldout-ortho",
+    "note": "HELD-OUT: written after the parser fixes, not tuned on",
+    "text": "Tab. Zerodol-P   1-1-1  x 5d  PC\nTab. Pantocid 40   1-0-0  AC\nTab. Shelcal-HD   0-1-0\nGel Volini — local application twice daily",
+    "expected": [
+      {
+        "name": "zerodol",
+        "slots": [
+          "morning",
+          "afternoon",
+          "night"
+        ]
+      },
+      {
+        "name": "pantocid",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "shelcal",
+        "slots": [
+          "afternoon"
+        ]
+      },
+      {
+        "name": "volini",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "heldout-paeds",
+    "note": "HELD-OUT: child's syrups and drops",
+    "text": "Syp. Calpol 5 ml  TDS  x 3 days\nSyp. Ascoril LS 2.5 ml  BD\nNasivion paediatric drops  2 drops each nostril  HS",
+    "expected": [
+      {
+        "name": "calpol",
+        "slots": [
+          "morning",
+          "afternoon",
+          "night"
+        ]
+      },
+      {
+        "name": "ascoril",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "nasivion",
+        "slots": [
+          "night"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "heldout-mixed",
+    "note": "HELD-OUT: weekly dose and a conditional bedtime dose",
+    "text": "1. T. Thyrox 25 mcg — empty stomach, morning\n2. T. Metformin 500 — 1-0-1 with meals\n3. T. Vitamin D3 60K — once weekly x 8 weeks\n4. T. Cetirizine 10 — at bedtime if itching",
+    "expected": [
+      {
+        "name": "thyrox",
+        "slots": [
+          "morning"
+        ]
+      },
+      {
+        "name": "metformin",
+        "slots": [
+          "morning",
+          "night"
+        ]
+      },
+      {
+        "name": "vitamin d3",
+        "slots": [],
+        "note": "weekly: must be left for the human"
+      },
+      {
+        "name": "cetirizine",
+        "slots": [
+          "night"
+        ],
+        "asNeeded": true
+      }
     ]
   }
 ]

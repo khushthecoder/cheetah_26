@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { toWhatsAppText } from '../lib/share.ts'
+import { asNeededTiming, dueDaily, toWhatsAppText } from '../lib/share.ts'
 import { FOOD_LABELS, SLOT_LABELS, SLOTS, type Medicine, type Slot } from '../lib/types.ts'
 
 interface Props {
@@ -53,7 +53,7 @@ export function DoseCardView({ patientName, medicines, onEdit, onStartOver }: Pr
 
         <div className="dc-grid">
           {SLOTS.map((slot) => {
-            const due = medicines.filter((m) => m.doses[slot])
+            const due = dueDaily(medicines, slot)
             return (
               <div key={slot} className={`dc-slot slot-${slot} ${due.length ? '' : 'empty'}`}>
                 <div className="dc-slot-head">
@@ -99,7 +99,7 @@ export function DoseCardView({ patientName, medicines, onEdit, onStartOver }: Pr
                 <ul>
                   {asNeeded.map((m) => (
                     <li key={m.id}>
-                      <b>{m.name}</b> {m.strength} {m.instructions && `— ${m.instructions}`}
+                      <b>{m.name}</b> {m.strength} {asNeededTiming(m) && `(${asNeededTiming(m)})`} {m.instructions && `— ${m.instructions}`}
                     </li>
                   ))}
                 </ul>

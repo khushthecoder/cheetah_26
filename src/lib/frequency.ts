@@ -11,13 +11,29 @@ import { emptyDoses, type Food, type Slot, type SlotDoses } from './types.ts'
 export interface FrequencyResult {
   doses: SlotDoses
   asNeeded: boolean
-  /** Human-readable caveats, e.g. "Time of day not written — assumed morning". */
+  /** Human-readable caveats, e.g. "Once a day, but the time isn't written". */
   notes: string[]
 }
 
 const QTY = String.raw`(?:\d+(?:\.\d+)?|½|¼|¾|\d\/\d)`
-// 1-0-1, 1–0–1, 1 0 1, 1/0/1 (3 slots) and 1-0-0-1 (4 slots)
-const SLOT_PATTERN = new RegExp(String.raw`(?:^|[^\d/.])(${QTY})\s*[-–—/x ]\s*(${QTY})\s*[-–—/x ]\s*(${QTY})(?:\s*[-–—/x ]\s*(${QTY}))?(?![\d/.])`, 'i')
+// 1-0-1, 1 0 1, 1/0/1 (3 slots) and 1-0-0-1 (4 slots).
+// The separator must be the same throughout (\2) and a quantity can't be glued to letters or digits,
+// so "M1 1-0-1" and "Telma 40 1-0-0" only match the real "1-0-1" / "1-0-0".
+const SLOT_PATTERN = new RegExp(
+  String.raw`(?:^|[^\da-z/.½¼¾])(${QTY})\s*([-/ ])\s*(${QTY})\s*\2\s*(${QTY})(?:\s*\2\s*(${QTY}))?(?![\d/.a-z½¼¾])`,
+  'i',
+)
+/** More than this many units in one slot is almost certainly a misread (e.g. a strength), not a dose. */
+const MAX_UNITS_PER_SLOT = 4
+
+function qtyValue(q: string): number {
+  if (q === '½') return 0.5
+  if (q === '¼') return 0.25
+  if (q === '¾') return 0.75
+  const frac = q.match(/^(\d)\/(\d)$/)
+  if (frac) return Number(frac[1]) / Number(frac[2])
+  return Number(q)
+}
 
 function normalizeQty(raw: string): string | null {
   const q = raw.trim()
@@ -39,7 +55,11 @@ const has = (text: string, ...patterns: RegExp[]) => patterns.some((p) => p.test
 
 /** Returns null when the text cannot be interpreted with confidence. */
 export function interpretFrequency(input: string): FrequencyResult | null {
-  const text = ` ${input.toLowerCase().replace(/\s+/g, ' ').trim()} `
+  const text = ` ${input
+    .toLowerCase()
+    .replace(/[–—−]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()} `
   if (!text.trim()) return null
 
   // Weekly / alternate-day schedules don't fit a daily card — make the human decide.
@@ -47,11 +67,26 @@ export function interpretFrequency(input: string): FrequencyResult | null {
     return null
   }
 
-  const asNeeded = has(text, /\bsos\b/, /\bprn\b/, /\bas (and when )?needed\b/, /\bif (needed|required)\b/, /\bwhen required\b/, /\bin case of\b/)
+  const asNeeded = has(
+    text,
+    /\bsos\b/,
+    /\bprn\b/,
+    /\bas (and when )?needed\b/,
+    /\bif (needed|required)\b/,
+    /\bwhen required\b/,
+    /\bin case of\b/,
+    /\bonly if\b/,
+    /\bonly when\b/,
+    // Any written condition ("if itching", "agar dard ho") means it is not a daily medicine.
+    /\bif\b/,
+    /\bagar\b/,
+    /\bzar(u|oo|o)rat\b/,
+  )
 
   const slotMatch = text.match(SLOT_PATTERN)
   if (slotMatch) {
-    const [, a, b, c, d] = slotMatch
+    const [, a, , b, c, d] = slotMatch
+    if ([a, b, c, d].some((q) => q !== undefined && !(qtyValue(q) <= MAX_UNITS_PER_SLOT))) return null
     const doses = emptyDoses()
     if (d !== undefined) {
       doses.morning = normalizeQty(a)
@@ -87,10 +122,11 @@ export function interpretFrequency(input: string): FrequencyResult | null {
   if (slots.length > 0) return { doses: withSlots(slots), asNeeded, notes: [] }
 
   if (has(text, /\bod\b/, /\bqd\b/, /\bonce\b/, /\bdaily\b/, /\bonce a day\b/, /\b1 time\b/)) {
+    // "Once a day" says how often, not when. We don't pick a time on the doctor's behalf.
     return {
-      doses: withSlots(['morning']),
+      doses: emptyDoses(),
       asNeeded,
-      notes: ['Time of day not written — assumed morning. Confirm with the doctor or pharmacist.'],
+      notes: ['Once a day, but the time isn\'t written. Tap the time the doctor told you.'],
     }
   }
 
